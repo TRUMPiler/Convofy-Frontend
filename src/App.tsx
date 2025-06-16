@@ -1,0 +1,40 @@
+import { BrowserRouter as Router, Routes, Route } from 'react-router'
+import './App.css'
+import Test from './Pages/Test'
+import { Toaster } from "./Components/ui/sonner";
+import LoginPage from './Pages/Login';
+import RegisterPage from './Pages/Register';
+import Testing from './Pages/TestingMeet';
+import CreateMeeting from './Pages/TestingMeet';
+import JoinMeeting from './Pages/TestingMeet';
+import WaitingRoom from './Pages/WaitingQueue';
+
+function App() {
+  
+
+  return (
+    <>
+    <Toaster />
+    <Router>
+      <Routes>
+      <Route path="/" element={<Test />} />
+      <Route path="/Login" element={<LoginPage />} />
+      <Route path="/Register" element={<RegisterPage />} />
+      <Route path="/Waiting" element={<WaitingRoom />} />
+      <Route
+                path="/create"
+                element={<CreateMeeting />}
+              />
+              <Route
+                path="/join/:meetingId"
+                element={
+                  <JoinMeeting />
+                }
+              />
+      </Routes>
+      </Router>
+    </>
+  )
+}
+
+export default App
