@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import axios from "axios";
 import { toast } from "sonner";
 import GoogleRegisterButton from "./Sub-parts/GoogleRegisterButton"; // Import the GoogleRegisterButton component
@@ -13,9 +13,7 @@ const RegistrationPage: React.FC = () => {
         phone: "",
         image: "",
     });
-    const Check=()=>{
-        
-    }
+ 
     const headtowardLogin = () => {
         window.location.href = "./login";
     }

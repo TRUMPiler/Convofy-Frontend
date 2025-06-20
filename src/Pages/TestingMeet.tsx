@@ -2,7 +2,6 @@ import React from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { MeetingProvider } from "@videosdk.live/react-sdk";
 import MeetingView from "./MeetingView";
-import JoinScreen from "./Sub-parts/JoinMeeting";
 import { authToken, createMeeting } from "./Sub-parts/MeetComponents";
 import Cookies from "js-cookie";
 

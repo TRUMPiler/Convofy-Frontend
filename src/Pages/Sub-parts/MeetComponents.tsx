@@ -1,11 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import  { useState } from "react";
 import {
-  MeetingProvider,
-  MeetingConsumer,
+
   useMeeting,
-  useParticipant,
+
 } from "@videosdk.live/react-sdk";
-import ReactPlayer from "react-player";
+
 export const authToken: string = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhcGlrZXkiOiIxMmRhZDAzYS1mZTYwLTQzNjgtODI1MS0wYWVhZWU1MWNlOTkiLCJwZXJtaXNzaW9ucyI6WyJhbGxvd19qb2luIl0sImlhdCI6MTc0OTcyOTEzNiwiZXhwIjoxNzgxMjY1MTM2fQ.Da75q68UMwTo325_PgD74qqYj3Ah2Per--IQdU4chNg";
 
 export const createMeeting = async ({ token }: { token: string }) => {
@@ -20,15 +19,14 @@ export const createMeeting = async ({ token }: { token: string }) => {
   const { roomId }: { roomId: string } = await res.json();
   return roomId;
 };
-function JoinScreen({
-  getMeetingAndToken,
-}: {
-  getMeetingAndToken: (meeting?: string) => void,
-}) {
-  return null;
-}
+
 
 function ParticipantView({ participantId }: { participantId: string }) {
+  if(participantId!=null)
+  {
+    console.log(participantId);
+    return <div>{participantId}</div>;
+  }
   return null;
 }
 

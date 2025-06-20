@@ -4,10 +4,10 @@ import Test from './Pages/Test'
 import { Toaster } from "./Components/ui/sonner";
 import LoginPage from './Pages/Login';
 import RegisterPage from './Pages/Register';
-import Testing from './Pages/TestingMeet';
 import CreateMeeting from './Pages/TestingMeet';
 import JoinMeeting from './Pages/TestingMeet';
 import WaitingRoom from './Pages/WaitingQueue';
+import WsChecker from './Pages/WsChecker';
 
 function App() {
   
@@ -20,6 +20,7 @@ function App() {
       <Route path="/" element={<Test />} />
       <Route path="/Login" element={<LoginPage />} />
       <Route path="/Register" element={<RegisterPage />} />
+      <Route path="/WS" element={<WsChecker />} />
       <Route path="/Waiting" element={<WaitingRoom />} />
       <Route
                 path="/create"

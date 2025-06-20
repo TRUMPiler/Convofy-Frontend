@@ -43,7 +43,7 @@ const GoogleRegisterButton: React.FC = () => {
         toast.error('Registration Failed Please Try Again', { className: 'error' });
       }
     } catch (error: any) {
-      if(error.response!=undefined&&error.response.data.message=="User Already exists") { toast.error("You are already registered Please Login", { className: "error" }); console.error('Error during Google login:', error.response.data);}
+      if(error.response!=undefined&&error.response.status==409) { toast.error("You are already registered Please Login", { className: "error" }); console.error('Error during Google login:', error.response.data);}
        else if(error.response!=undefined&&error.response.data.message=="User is not logged in with google account") { toast.error("We could not find you\'re account with Google. Please Login with Website Crendentials", { className: "error" }); console.error('Error during Google login:', error.response.data);}
       else
       {

@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
-import axios from "axios";
-import Cookies from "js-cookie";
 
-const PermissionsSetup: React.FC<{ link: string }> = (props: { link: string }) => {
+
+const PermissionsSetup: React.FC<{}> = () => {
   const [videoPermission, setVideoPermission] = useState<boolean | null>(null);
   const [audioPermission, setAudioPermission] = useState<boolean | null>(null);
   const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -13,9 +12,6 @@ const PermissionsSetup: React.FC<{ link: string }> = (props: { link: string }) =
  
 
 
-  const redirectToMeeting = (meetId: string) => {
-    window.location.href = `/meeting/${meetId}`;
-  };
   const checkPermissions = async () => {
     try {
       // Request video and audio permissions
