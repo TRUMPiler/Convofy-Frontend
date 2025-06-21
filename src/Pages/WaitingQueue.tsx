@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react"; // Import useRef
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import Cookies from "js-cookie";
@@ -6,138 +6,151 @@ import { toast } from "sonner";
 import Navbar from "./Sub-parts/NavigationBar";
 import { Client } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
+import { Cookie } from "lucide-react";
 
 const WaitingRoom: React.FC = () => {
   const navigate = useNavigate();
   const [status, setStatus] = useState<"waiting" | "ready" | "error" | "Nothing">("Nothing");
-  const [Userid2, setUserid2] = useState<string | null>(null);  
+  const [otherUserEmail, setOtherUserEmail] = useState<string | null>(null);
   const [meetId, setMeetId] = useState<string | null>(null);
-  const [gotuser, setGotuser] = useState<boolean|null>(true);
 
-  if (!Cookies.get("userId")) {
+  // Use a ref to track if the checkQueueStatus has been initiated
+  const checkQueueInitiated = useRef(false);
+
+  // Redirect to login if email is not present in cookies
+  // This should ideally be handled by a router guard or a higher-order component
+  // to prevent rendering the component entirely if not authenticated.
+  if (!Cookies.get("email")) {
     navigate("/login");
   }
 
+  // WebSocket connection
   useEffect(() => {
-    // WebSocket listener for meeting ID updates
-    const fetchMeetId = () => {
-      const client = new Client({
-        webSocketFactory: () => new SockJS("http://localhost:8080/ws"),
-        debug: (str) => console.log(str),
-        onConnect: () => {
-          console.log("Connected to WebSocket server");
-          client.subscribe("/queue/matches", (message) => {
-            console.log("Received message:", message.body);
-            const userid=Cookies.get("userId");
-            try {
-              const data = JSON.parse(message.body);
-              if (data.userId!==userid) {
-                
-              }
+    const email = Cookies.get("email");
+    if (!email) {
+      // If email is not present, the navigate("/login") above will handle it.
+      // We can return early from this effect as well.
+      return;
+    }
+
+    const client = new Client({
+      webSocketFactory: () => new SockJS("http://localhost:8080/ws"),
+      debug: (str) => console.log(str),
+      onConnect: () => {
+        console.log("Connected to WebSocket server");
+        client.subscribe("/queue/matches", (message) => {
+          try {
+            const data = JSON.parse(message.body);
+            console.log("Received WebSocket message:", data);
+            if (data.userId === email) { // Use '===' for strict equality
               if (data.meetId) {
+                setOtherUserEmail(data.useremail);
+                Cookies.set("matchedEmail", data.useremail);
                 setMeetId(data.meetId);
                 setStatus("ready");
               }
-            } catch (error) {
-              console.error("Error parsing message:", error);
             }
-          });
-        },
-        onDisconnect: () => console.log("Disconnected from WebSocket server"),
-      });
+          } catch (error) {
+            console.error("Error parsing WebSocket message:", error);
+          }
+        });
+      },
+      onStompError: (frame) => {
+        console.error('Broker reported error: ' + frame.headers['message']);
+        console.error('Additional details: ' + frame.body);
+      },
+      onDisconnect: () => {
+        console.log("Disconnected from WebSocket server");
+      }
+    });
 
-      client.activate();
+    client.activate();
 
-      // Cleanup WebSocket connection
-      return () => {
-        if (client.active) {
-          client.deactivate();
-        }
-      };
+    return () => {
+      if (client.active) {
+        client.deactivate();
+      }
     };
+  }, []); // Empty dependency array ensures this runs once on mount
 
-    if (status === "waiting") {
-      fetchMeetId();
-    }
-  }, [status]);
-
+  // Check queue status
+  // This function is now memoized by useCallback to prevent re-creation on every render
+  // and ensure it's stable for useEffect's dependency array.
   const checkQueueStatus = async () => {
-    try {
-      const userId = Cookies.get("userId");
-      if (status === "ready") return;
+    // Only proceed if the check hasn't been initiated yet
+    if (checkQueueInitiated.current) {
+        return;
+    }
 
-      if (!userId) {
-        toast.error("User ID not found in cookies.");
+    checkQueueInitiated.current = true; // Set to true to prevent future calls
+
+    try {
+      const email = Cookies.get("email");
+      if (!email) {
+        toast.error("Email not found in cookies.");
         setStatus("error");
         return;
       }
 
-      const response = await axios.get(`http://localhost:8080/api/queue/check/${userId}`);
-      console.log(response.data);
+      const response = await axios.get(`http://localhost:8080/api/queue/check/${email}`);
+    
 
       if (response.data.success && response.status === 200) {
-        console.log("Matched with:", response.data.data);
-        const createmeetingResponse = await axios.post(
+        const matchedEmail = response.data.data;
+        setOtherUserEmail(matchedEmail);
+        Cookies.set("matchedEmail", matchedEmail);
+
+        const createMeetingResponse = await axios.post(
           "http://localhost:8080/api/meetings/create",
-          {
-            userid1: userId,
-            userid2: response.data.data,
-          },
+          { userid1: email, userid2: matchedEmail },
           { headers: { "Content-Type": "application/json" } }
         );
-
-        console.log(createmeetingResponse.data);
-        if (createmeetingResponse.data.success) {
-          setMeetId(createmeetingResponse.data.data.meetid);
-          Cookies.set("Sessionid", createmeetingResponse.data.data.sessionid);
+        console.log(createMeetingResponse.data);
+        if (createMeetingResponse.data.success) {
+          setMeetId(createMeetingResponse.data.data.meetid);
           setStatus("ready");
         } else {
           setStatus("error");
-          console.log("Error creating meeting");
         }
-      } else if (response.data.success && response.status === 201) {
+      } else if (response.data.success && (response.status === 201 || response.status === 208)) {
         setStatus("waiting");
         toast.info("You are in the queue, waiting...");
-      } else if (response.data.success && response.status === 208) {
-        setStatus("waiting");
-        toast.info("You are already in the queue, waiting...");
+      } else {
+          // Handle cases where success is false but status is not 201/208
+          toast.error(response.data.message || "Failed to check queue status.");
+          setStatus("error");
       }
     } catch (error) {
       console.error("Error checking queue status:", error);
+      toast.error("Failed to check queue status.");
       setStatus("error");
     }
   };
 
+  // Trigger queue status check only once on component mount
   useEffect(() => {
-    // Redirect the user when ready
-    if (status === "ready" && meetId) {
-      navigate(`/join/${meetId}`);
-    }
-  }, [status, meetId, navigate]);
+    // Call checkQueueStatus within useEffect to ensure it runs as a side effect.
+    // The ref prevents it from being called again if StrictMode is active.
+    checkQueueStatus();
+  }, []); // Empty dependency array ensures this effect runs only once on mount
 
-  const joinMeeting = () => {
-    if (meetId) {
-      window.location.href = `/join/${meetId}`;
-    }
-  };
-
-  useEffect(() => {
-    setTimeout(() => {
-      checkQueueStatus();
-    }, 1000);
-  }, [gotuser]);
+  // Redirect the user when ready
+  // useEffect(() => {
+  //   if (status === "ready" && meetId) {
+  //     navigate(`/join/${meetId}`);
+  //   }
+  // }, [status, meetId, navigate]); // Dependencies are correct here
 
   return (
     <>
       <Navbar />
       <div className="flex flex-col items-center justify-center min-h-screen">
-        
         {status === "ready" && (
           <div>
-            <p>Meeting with {Userid2} is ready. Meeting ID: {meetId}</p>
+            <p>Meeting with {otherUserEmail} is ready. Meeting ID: {meetId}</p>
             <button
               className="bg-green-500 text-white py-2 px-4 rounded"
-              onClick={joinMeeting}
+              onClick={() => navigate(`/join/${meetId}`)}
             >
               Join Meeting
             </button>
@@ -149,7 +162,7 @@ const WaitingRoom: React.FC = () => {
             <p>Error occurred. Please try again.</p>
             <button
               className="bg-red-500 text-white py-2 px-4 rounded"
-              onClick={checkQueueStatus}
+              onClick={checkQueueStatus} // Allow retrying on error
             >
               Retry
             </button>
