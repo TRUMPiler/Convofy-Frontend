@@ -4,42 +4,52 @@ import axios from 'axios';
 import { toast } from 'sonner';
 import Cookies from 'js-cookie';
 import Navbar from './Sub-parts/NavigationBar';
+
 const LoginPage: React.FC = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
+
     const headtowardRegister = () => {
         window.location.href = './register';
     }
+
     const handleLogin = async () => {
         try {
             setLoading(true);
             const response = await axios.post(
                 'http://localhost:8080/api/users/login',
                 { email, password },
-                { headers: { 'Content-Type': 'application/json' } }     
+                { headers: { 'Content-Type': 'application/json' } }    
             );
-            console.log(response.data); 
-            if (response.data.success) {
-                toast('Login Successful! Welcome back!', { className: 'success' });
+            
+            // Log the full response data for debugging
+            console.log("Login Response Data:", response.data); 
+
+            if (response.data.success && response.data.data) {
+                const { jwt, userId, name, email: userEmail, image } = response.data.data;
+
+                // Store JWT in a cookie
+                Cookies.set('jwtToken', jwt, { expires: 1/2 }); // Expires in 12 hours (1/2 day)
+                Cookies.set('userId', userId.toString());
+                Cookies.set('name', name.toString());
+                Cookies.set('email', userEmail.toString()); // Use userEmail to avoid conflict with useState email
+                Cookies.set('avatar', image ?? 'https://github.com/shadcn.png');
+
                 toast.success('Login Successful! Welcome back!', { className: 'success' });
-                Cookies.set('userId', response.data.data.userid.toString());
-                Cookies.set('name', response.data.data.name.toString());
-                Cookies.set('email', response.data.data.email.toString());
-                Cookies.set('avatar', response.data.data.image ?? 'https://github.com/shadcn.png');
+                
                 setTimeout(() => {
-                    window.location.href = './';
+                    window.location.href = './'; // Redirect to home page
                 }, 1500);
-                console.log(response.data);
             } else {
-                toast.error('Invalid email or password. Please try again.', { className: 'error' });
+                toast.error(response.data.message || 'Invalid email or password. Please try again.', { className: 'error' });
             }
         } catch (error: any) {
-            console.log(error);
-            if(error.response.status==401&& error.response.status!=null){toast.error('Invalid email or password. Please try again.', { className: 'error' });}
-            else{
             console.error('Error during login:', error);
-            toast.error('An error occurred. Please try again later.', { className: 'error' });
+            if (error.response && error.response.status === 401) {
+                toast.error('Invalid email or password. Please try again.', { className: 'error' });
+            } else {
+                toast.error('An error occurred. Please try again later.', { className: 'error' });
             }
         } finally {
             setLoading(false);
@@ -89,10 +99,9 @@ const LoginPage: React.FC = () => {
                     {/* Google Login */}
                     <GoogleLoginButton />
                     <div className="flex justify-center items-center my-4">
-                   <button
+                    <button
                         className="w-full py-2 bg-blue-600 text-white rounded shadow"
                         onClick={headtowardRegister}
-                        
                     >
                         Register
                     </button>

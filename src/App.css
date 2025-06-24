@@ -114,6 +114,24 @@
   * {
     @apply border-border outline-ring/50;
   }
+  .custom-scrollbar::-webkit-scrollbar {
+  width: 8px; /* For vertical scrollbar */
+  height: 8px; /* For horizontal scrollbar */
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: var(--background-secondary); /* Darker track */
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--muted-foreground); /* Muted color for thumb */
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary); /* Slightly lighter on hover */
+}
   body {
     @apply bg-background text-foreground;
   }
