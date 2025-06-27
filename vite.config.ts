@@ -10,6 +10,13 @@ export default defineConfig({
     fs:{
       strict: false,
     },
+    proxy: {
+            '/api': {
+                target: 'http://3.108.249.57:8080',
+                changeOrigin: true,
+                secure: false, // Only for development
+            },
+        },
   },
   plugins: [react(), tailwindcss()],
   base: '/',
