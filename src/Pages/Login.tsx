@@ -18,7 +18,7 @@ const LoginPage: React.FC = () => {
         try {
             setLoading(true);
             const response = await axios.post(
-                'http://localhost:8080/api/users/login',
+                'http://3.108.249.57:8080/api/users/login',
                 { email, password },
                 { headers: { 'Content-Type': 'application/json' } }    
             );

@@ -34,7 +34,7 @@ const WaitingRoom: React.FC = () => {
     }
 
     const client = new Client({
-      webSocketFactory: () => new SockJS("http://localhost:8080/ws"),
+      webSocketFactory: () => new SockJS("http://3.108.249.57:8080/ws"),
       debug: (str) => console.log(str),
       onConnect: () => {
         console.log("Connected to WebSocket server");
@@ -92,7 +92,7 @@ const WaitingRoom: React.FC = () => {
         return;
       }
 
-      const response = await axios.get(`http://localhost:8080/api/queue/check/${email}`);
+      const response = await axios.get(`http://3.108.249.57:8080/api/queue/check/${email}`);
     
 
       if (response.data.success && response.status === 200) {
@@ -101,7 +101,7 @@ const WaitingRoom: React.FC = () => {
         Cookies.set("matchedEmail", matchedEmail);
 
         const createMeetingResponse = await axios.post(
-          "http://localhost:8080/api/meetings/create",
+          "http://3.108.249.57:8080/api/meetings/create",
           { userid1: email, userid2: matchedEmail },
           { headers: { "Content-Type": "application/json" } }
         );

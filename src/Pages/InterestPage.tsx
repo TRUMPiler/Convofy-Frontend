@@ -27,7 +27,7 @@ const InterestsPage: React.FC = () => {
       try {
         setLoading(true);
         setError(null);
-        const response = await axios.get('http://localhost:8080/api/interests?status=ACTIVE');
+        const response = await axios.get('http://3.108.249.57:8080/api/interests?status=ACTIVE');
         if (response.data.success) {
           setAvailableInterests(response.data.data);
         } else {
