@@ -19,7 +19,7 @@ const GoogleRegisterButton: React.FC = () => {
             console.log('Picture:', decoded.picture);
 
             const response = await axios.post(
-                'http://3.108.249.57:8080/api/users', // This is the registration endpoint
+                'https://3.108.249.57:8080/api/users', // This is the registration endpoint
                 {
                     name: decoded.name,
                     email: decoded.email,

@@ -20,7 +20,7 @@ const GoogleLoginButton: React.FC = () => {
 
       // Sending email and a placeholder password to your backend /api/users/login
       const response = await axios.post(
-        'http://3.108.249.57:8080/api/users/login',
+        'https://3.108.249.57:8080/api/users/login',
         {
           email: decoded.email,
           password: 'GoogleLogin', // This placeholder password should match what your backend expects for Google logins
