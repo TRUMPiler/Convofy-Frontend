@@ -18,7 +18,7 @@ const LoginPage: React.FC = () => {
         try {
             setLoading(true);
             const response = await axios.post(
-                'https://ec2-3-108-249-57.ap-south-1.compute.amazonaws.com:8080/api/users/login',
+                'http://ec2-3-108-249-57.ap-south-1.compute.amazonaws.com:8080/api/users/login',
                 { email, password },
                 { headers: { 'Content-Type': 'application/json' } }    
             );
