@@ -34,7 +34,7 @@ const WaitingRoom: React.FC = () => {
     }
 
     const client = new Client({
-      webSocketFactory: () => new SockJS("https://3.108.249.57:8080/ws"),
+      webSocketFactory: () => new SockJS("https://api.convofy.fun/ws"),
       debug: (str) => console.log(str),
       onConnect: () => {
         console.log("Connected to WebSocket server");
@@ -92,7 +92,7 @@ const WaitingRoom: React.FC = () => {
         return;
       }
 
-      const response = await axios.get(`https://3.108.249.57:8080/api/queue/check/${email}`);
+      const response = await axios.get(`https://api.convofy.fun/api/queue/check/${email}`);
     
 
       if (response.data.success && response.status === 200) {

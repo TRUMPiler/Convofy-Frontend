@@ -242,7 +242,7 @@ const ChatroomPage: React.FC = () => {
         setLoadingChatroom(true);
         setErrorChatroom(null);
         // Make API call to get interest details (chatroom name)
-        const response = await axios.get(`https://3.108.249.57:8080/api/interests/${chatroomId}`);
+        const response = await axios.get(`https://api.convofy.fun/api/interests/${chatroomId}`);
 
         if (response.data.success && response.data.data) {
           setChatroomName(response.data.data.name);

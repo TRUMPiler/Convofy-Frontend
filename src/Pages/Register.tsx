@@ -35,7 +35,7 @@ const RegistrationPage: React.FC = () => {
 
         try {
             const response = await axios.post(
-                "https://3.108.249.57:8080/api/users",
+                "https://api.convofy.fun/api/users",
                 { name, email, password, phone, image }, // Send image if you want it to be part of registration
                 { headers: { "Content-Type": "application/json" } }
             );
