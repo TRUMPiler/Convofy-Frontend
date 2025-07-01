@@ -96,7 +96,7 @@ const ChatroomPage: React.FC = () => {
         }
 
         // Make API call to fetch chat history using the optimized backend endpoint
-        const response = await axios.get(`https://3.108.249.57:8080/api/chat/history/${chatroomId}?page=0&size=50`, {
+        const response = await axios.get(`https://api.convofy.fun/api/chat/history/${chatroomId}?page=0&size=50`, {
           headers: {
             Authorization: `Bearer ${jwtToken}`, // Include JWT for authorization
           },
