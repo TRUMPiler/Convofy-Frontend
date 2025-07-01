@@ -1,13 +1,14 @@
 // src/pages/ChatroomPage.tsx
 
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import Navbar from './Sub-parts/NavigationBar'; // Assuming Navbar is fixed and has a height
 import axios from 'axios';
 import { toast } from 'sonner';
 import SockJS from 'sockjs-client';
 import { Stomp } from '@stomp/stompjs';
 import Cookies from 'js-cookie';
+const navigate=useNavigate();
 
 // Define the structure for an Interest object received from the backend
 interface Interest {
@@ -91,6 +92,7 @@ const ChatroomPage: React.FC = () => {
         const jwtToken = getJwtToken();
         if (!jwtToken) {
           toast.error('Authentication required to fetch chat history.');
+          navigate("/login");
           setMessages([]);
           return;
         }
