@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 import SockJS from 'sockjs-client';
 import { Stomp } from '@stomp/stompjs';
 import Cookies from 'js-cookie';
-const navigate=useNavigate();
+
 
 // Define the structure for an Interest object received from the backend
 interface Interest {
@@ -57,7 +57,7 @@ const ChatroomPage: React.FC = () => {
   // Provides a default 'Guest' if not found, but it's important for the login flow to set this cookie.
   const currentUserId = Cookies.get('userId');
   if(!currentUserId) {
-    navigate("/Login");
+    window.location.href = "./login";
   }
   // Helper function to retrieve JWT token from cookies
   const getJwtToken = () => {
