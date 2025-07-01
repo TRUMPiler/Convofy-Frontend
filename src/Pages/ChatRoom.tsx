@@ -56,7 +56,9 @@ const ChatroomPage: React.FC = () => {
   // Retrieve the current logged-in user's ID from cookies
   // Provides a default 'Guest' if not found, but it's important for the login flow to set this cookie.
   const currentUserId = Cookies.get('userId');
-
+  if(!currentUserId) {
+    navigate("/Login");
+  }
   // Helper function to retrieve JWT token from cookies
   const getJwtToken = () => {
     const name = 'jwtToken=';
