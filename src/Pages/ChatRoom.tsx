@@ -94,7 +94,6 @@ const ChatroomPage: React.FC = () => {
         const jwtToken = getJwtToken();
         if (!jwtToken) {
           toast.error('Authentication required to fetch chat history.');
-          navigate("/login");
           setMessages([]);
           return;
         }
