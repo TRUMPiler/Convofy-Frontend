@@ -341,31 +341,30 @@ const ChatroomPage: React.FC = () => {
         {/* Sidebar */}
         <aside
           className={`
-            w-64 bg-card border-r border-border p-4 flex flex-col
-            fixed left-0 z-30 transform transition-transform duration-300 ease-in-out
-            md:relative md:translate-x-0 md:flex md:top-auto md:h-auto md:z-auto
-            ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-            // For mobile, sidebar starts below Navbar and takes remaining height
-            h-[calc(100vh-64px)] top-16 // Navbar is assumed h-16 = 64px
-          `}
-        >
-          {/* Adjusted mt to 0 as the sidebar's top is now correctly positioned below the Navbar */}
-          <h2 className="text-xl font-semibold mb-4 mt-0 md:mt-0 text-primary">Users Online ({onlineUsers.length})</h2>
+                      w-64 bg-card border-r border-border p-4 flex flex-col
+                      fixed left-0 z-30 transform transition-transform duration-300 ease-in-out
+                      md:relative md:translate-x-0 md:flex md:top-auto md:h-auto md:z-auto
+                      ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+                      // For mobile, sidebar starts below Navbar and takes remaining height
+                      h-[calc(100vh-64px)] top-16 // Navbar is assumed h-16 = 64px
+                    `}>
+          {/* Corrected: Only ONE h2 for Users Online */}
+          <h2 className="text-xl font-semibold mb-4 text-primary">Users Online ({onlineUsers.length})</h2>
 
           {/* Connect Button */}
           <div className="mb-6">
             <button
               onClick={handleConnectRandom}
               className="bg-accent text-accent-foreground px-4 py-2 rounded-md font-semibold text-sm w-full
-                          hover:bg-accent/90 transition-colors duration-300 shadow-sm
-                          focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-50"
+                 hover:bg-accent/90 transition-colors duration-300 shadow-sm
+                 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-50"
             >
-
               Connect with a random?
             </button>
           </div>
-          <h2 className="text-xl font-semibold mb-4 mt-0 md:mt-0 text-primary">Users Online ({onlineUsers.length})</h2>
-          <div className="space-y-3 overflow-y-auto flex-grow">
+
+          {/* Online Users List Container - ADDED min-h-0 here */}
+          <div className="space-y-3 overflow-y-auto flex-grow **min-h-0**">
             {onlineUsers.length === 0 && !loadingChatroom ? (
               <p className="text-sm text-muted-foreground">No users online in this chatroom.</p>
             ) : (
@@ -384,6 +383,7 @@ const ChatroomPage: React.FC = () => {
             )}
           </div>
         </aside>
+
 
         {/* Overlay for mobile sidebar */}
         {isSidebarOpen && (
