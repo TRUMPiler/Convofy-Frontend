@@ -68,6 +68,11 @@ const ChatroomPage: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Debugging: Log onlineUsers state changes
+  useEffect(() => {
+    console.log('onlineUsers state updated:', onlineUsers);
+  }, [onlineUsers]);
+
   useEffect(() => {
     const fetchChatHistory = async () => {
       if (!chatroomId) {
@@ -128,13 +133,7 @@ const ChatroomPage: React.FC = () => {
     stompClient.current.connect(headers, () => {
       console.log('Connected to WebSocket server!');
 
-      stompClient.current.send(
-        `/app/chat.joinRoom`,
-        headers,
-        JSON.stringify({ chatroomId: chatroomId })
-      );
-      console.log(`Sent join room message for chatroom: ${chatroomId}`);
-
+      // Subscribe FIRST to ensure listener is active
       stompClient.current.subscribe(`/topic/chatroom/${chatroomId}/onlineUsers`, (message: any) => {
         const receivedUsers: OnlineUser[] = JSON.parse(message.body);
         setOnlineUsers(receivedUsers);
@@ -146,6 +145,17 @@ const ChatroomPage: React.FC = () => {
         console.log('Received new message:', receivedMessage);
         setMessages((prevMessages) => [...prevMessages, receivedMessage]);
       }, headers);
+
+      // Add a small delay before sending join room message
+      // This helps ensure the subscriptions are fully active before the join message is processed by the backend
+      setTimeout(() => {
+        stompClient.current.send(
+          `/app/chat.joinRoom`,
+          headers,
+          JSON.stringify({ chatroomId: chatroomId })
+        );
+        console.log(`Sent join room message for chatroom: ${chatroomId} after delay.`);
+      }, 100); // 100ms delay
 
     }, (error: any) => {
       console.error('WebSocket connection error:', error);
