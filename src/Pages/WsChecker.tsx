@@ -13,7 +13,7 @@ const WsChecker: React.FC = () => {
 
   useEffect(() => {
     const client = new Client({
-      webSocketFactory: () => new SockJS("https://3.108.249.57:8080/ws"),
+      webSocketFactory: () => new SockJS("https://convofy-frontend-weld.vercel.app/ws"),
       debug: (str) => console.log(str),
       onConnect: () => {
         console.log("Connected to WebSocket server");

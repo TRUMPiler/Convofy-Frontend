@@ -135,7 +135,7 @@ const ChatroomPage: React.FC = () => {
     }
 
     // Initialize SockJS and STOMP client
-    const socket = new SockJS('https://3.108.249.57:8080/ws');
+    const socket = new SockJS('https://api.convofy.fun/ws');
     stompClient.current = Stomp.over(socket);
 
     const headers = {
