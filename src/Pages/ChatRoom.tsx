@@ -295,11 +295,12 @@ const ChatroomPage: React.FC = () => {
             md:relative md:translate-x-0 md:flex md:top-auto md:h-auto md:z-auto
             ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
             h-[calc(100vh-64px)] top-16
+            overflow-y-auto
           `}
         >
-          <h2 className="text-xl font-semibold mb-4 text-primary">Users Online ({onlineUsers.length})</h2>
+          <h2 className="text-xl font-semibold mb-4 text-primary flex-shrink-0">Users Online ({onlineUsers.length})</h2>
 
-          <div className="mb-6">
+          <div className="mb-6 flex-shrink-0">
             <button
               onClick={handleConnectRandom}
               className="bg-accent text-accent-foreground px-4 py-2 rounded-md font-semibold text-sm w-full
@@ -309,7 +310,7 @@ const ChatroomPage: React.FC = () => {
               Connect with a random?
             </button>
           </div>
-          <div className="space-y-3 overflow-y-auto flex-grow min-h-0">
+          <div className="space-y-3 flex-grow min-h-0">
             {onlineUsers.length === 0 && !loadingChatroom ? (
               <p className="text-sm text-muted-foreground">No users online in this chatroom.</p>
             ) : (
