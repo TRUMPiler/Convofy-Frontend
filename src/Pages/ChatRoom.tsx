@@ -56,7 +56,7 @@ const ChatroomPage: React.FC = () => {
   // Retrieve the current logged-in user's ID from cookies
   // Provides a default 'Guest' if not found, but it's important for the login flow to set this cookie.
   const currentUserId = Cookies.get('userId');
-  if(!currentUserId) {
+  if (!currentUserId) {
     window.location.href = "/login";
   }
   // Helper function to retrieve JWT token from cookies
@@ -64,14 +64,14 @@ const ChatroomPage: React.FC = () => {
     const name = 'jwtToken=';
     const decodedCookie = decodeURIComponent(document.cookie);
     const ca = decodedCookie.split(';');
-    for(let i = 0; i <ca.length; i++) {
-        let c = ca[i];
-        while (c.charAt(0) === ' ') {
-            c = c.substring(1);
-        }
-        if (c.indexOf(name) === 0) {
-            return c.substring(name.length, c.length);
-        }
+    for (let i = 0; i < ca.length; i++) {
+      let c = ca[i];
+      while (c.charAt(0) === ' ') {
+        c = c.substring(1);
+      }
+      if (c.indexOf(name) === 0) {
+        return c.substring(name.length, c.length);
+      }
     }
     return '';
   };
@@ -360,27 +360,27 @@ const ChatroomPage: React.FC = () => {
                           hover:bg-accent/90 transition-colors duration-300 shadow-sm
                           focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-50"
             >
-              
+
               Connect with a random?
             </button>
           </div>
-<h2 className="text-xl font-semibold mb-4 mt-0 md:mt-0 text-primary">Users Online ({onlineUsers.length})</h2>
+          <h2 className="text-xl font-semibold mb-4 mt-0 md:mt-0 text-primary">Users Online ({onlineUsers.length})</h2>
           <div className="space-y-3 overflow-y-auto flex-grow">
             {onlineUsers.length === 0 && !loadingChatroom ? (
-                <p className="text-sm text-muted-foreground">No users online in this chatroom.</p>
+              <p className="text-sm text-muted-foreground">No users online in this chatroom.</p>
             ) : (
-                onlineUsers.map((user) => (
-                    <div key={user.userId} className="flex items-center space-x-3">
-                        <img
-                            src={user.avatar}
-                            alt={user.name}
-                            className="w-8 h-8 rounded-full object-cover border border-border"
-                            referrerPolicy='no-referrer'
-                        />
-                        <span className="text-sm text-foreground">{user.name}</span>
-                        <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" title="Online"></span>
-                    </div>
-                ))
+              onlineUsers.map((user) => (
+                <div key={user.userId} className="flex items-center space-x-3">
+                  <img
+                    src={user.avatar}
+                    alt={user.name}
+                    className="w-8 h-8 rounded-full object-cover border border-border"
+                    referrerPolicy='no-referrer'
+                  />
+                  <span className="text-sm text-foreground">{user.name}</span>
+                  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" title="Online"></span>
+                </div>
+              ))
             )}
           </div>
         </aside>
@@ -409,83 +409,85 @@ const ChatroomPage: React.FC = () => {
           {/* This is the key change: min-h-0 and flex-grow are crucial for scrolling */}
           <div className="flex-grow overflow-y-auto space-y-4 pr-2 custom-scrollbar min-h-0">
             {messages.length === 0 ? ( // Use dynamic 'messages' state here
-                <p className="text-center text-muted-foreground mt-10">No messages yet. Start the conversation!</p>
+              <p className="text-center text-muted-foreground mt-10">No messages yet. Start the conversation!</p>
             ) : (
-                messages.map((msg) => {
-                  const isOwnMessage = msg.userId === currentUserId; // Check if it's the current user's message
-                  return (
-                    <div
-                      key={msg.id} // Use msg.id from the backend response
-                      className={`flex items-start space-x-3 ${isOwnMessage ? 'justify-end' : 'justify-start'}`} // Align right for own messages
-                    >
-                      {/* Avatar and Name for others' messages */}
-                      {!isOwnMessage && (
-                        <img
-                          src={msg.userAvatar || 'https://ui-avatars.com/api/?name=NA&background=random'} // Use msg.userAvatar from fetched data
-                          alt={msg.userName}
-                          className="w-8 h-8 rounded-full object-cover flex-shrink-0 border border-border"
-                          referrerPolicy='no-referrer'
-                        />
-                      )}
+              messages.map((msg) => {
+                const isOwnMessage = msg.userId === currentUserId; // Check if it's the current user's message
+                return (
+                  <div
+                    key={msg.id} // Use msg.id from the backend response
+                    className={`flex items-start space-x-3 ${isOwnMessage ? 'justify-end' : 'justify-start'}`} // Align right for own messages
+                  >
+                    {/* Avatar and Name for others' messages */}
+                    {!isOwnMessage && (
+                      <img
+                        src={msg.userAvatar || 'https://ui-avatars.com/api/?name=NA&background=random'} // Use msg.userAvatar from fetched data
+                        alt={msg.userName}
+                        className="w-8 h-8 rounded-full object-cover flex-shrink-0 border border-border"
+                        referrerPolicy='no-referrer'
+                      />
+                    )}
 
-                      <div className={`flex flex-col ${isOwnMessage ? 'items-end' : 'items-start'}`}>
-                        {/* Name and Time for others' messages, "You" and Time for own messages */}
-                        <div className={`flex items-baseline space-x-2 ${isOwnMessage ? 'flex-row-reverse space-x-reverse' : ''}`}>
-                          {/* Format the timestamp from ISO string to a readable time */}
-                          <span className="text-xs text-muted-foreground">
-  {new Date(msg.time).toLocaleString([], {
-    month: '2-digit',
-    day: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true
-  })}
-</span>
-                          {!isOwnMessage ? (
-                            <span className="font-semibold text-primary">{msg.userName}</span>
-                          ) : (
-                            <span className="font-semibold text-blue-500">You</span> // Differentiate "You"
-                          )}
-                        </div>
-                        <p
-                          className={`
+                    <div className={`flex flex-col ${isOwnMessage ? 'items-end' : 'items-start'}`}>
+                      {/* Name and Time for others' messages, "You" and Time for own messages */}
+                      <div className={`flex items-baseline space-x-2 ${isOwnMessage ? 'flex-row-reverse space-x-reverse' : ''}`}>
+                        {/* Format the timestamp from ISO string to a readable time */}
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(msg.time).toLocaleString([], {
+                            month: '2-digit',
+                            day: '2-digit',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            hour12: true
+                          })}
+                        </span>
+                        {!isOwnMessage ? (
+                          <span className="font-semibold text-primary">{msg.userName}</span>
+                        ) : (
+                          <span className="font-semibold text-blue-500">You</span> // Differentiate "You"
+                        )}
+                      </div>
+                      <p
+                        className={`
                             rounded-lg px-4 py-2 text-foreground break-words max-w-lg shadow-sm
                             ${isOwnMessage ? 'bg-blue-600 text-white' : 'bg-secondary'}
                           `}
-                        >
-                          {msg.text}
-                        </p>
-                      </div>
+                      >
+                        {msg.text}
+                      </p>
                     </div>
-                  );
-                })
+                  </div>
+                );
+              })
             )}
             <div ref={messagesEndRef} />
           </div>
 
           {/* Message Input Area */}
           <div className="mt-4 flex items-center space-x-3 border-t border-border pt-4">
-            <input
-              type="text"
-              placeholder="Type your message..."
-              className="flex-grow p-3 rounded-lg bg-input border border-border text-foreground
-                          focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
-              value={newMessageText} // Bind value to state
-              onChange={(e) => setNewMessageText(e.target.value)} // Update state on change
-              onKeyDown={handleKeyPress} // Changed to onKeyDown
-              // Disable input if WebSocket is not connected
-              disabled={!stompClient.current?.connected || loadingChatroom}
-            />
-            <button
-              className="bg-primary text-primary-foreground px-5 py-3 rounded-lg font-semibold
-                          hover:bg-primary/90 transition-colors duration-300 disabled:opacity-50"
-              onClick={handleSendMessage} // Call send message handler
-              // Disable button if not connected, loading chatroom, or message is empty
-              disabled={!stompClient.current?.connected || loadingChatroom || newMessageText.trim() === ''}
-            >
-              Send
-            </button>
+            {/* Wrap your input and button in a form */}
+            <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="fixed bottom-0 left-0 right-0 bg-background p-4 border-t border-border flex items-center space-x-3 z-50">
+              <input
+                type="text"
+                placeholder="Type your message..."
+                className="flex-grow p-3 rounded-lg bg-input border border-border text-foreground
+               focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+                value={newMessageText}
+                onChange={(e) => setNewMessageText(e.target.value)}
+                // onKeyDown={handleKeyPress} // Still useful for desktop Enter key
+                disabled={!stompClient.current?.connected || loadingChatroom}
+              />
+              <button
+                type="submit" // Set button type to submit
+                className="bg-primary text-primary-foreground px-5 py-3 rounded-lg font-semibold
+               hover:bg-primary/90 transition-colors duration-300 disabled:opacity-50"
+                // onClick={handleSendMessage} // No longer strictly needed if form handles submit, but good as a fallback
+                disabled={!stompClient.current?.connected || loadingChatroom || newMessageText.trim() === ''}
+              >
+                Send
+              </button>
+            </form>
           </div>
         </section>
       </main>
