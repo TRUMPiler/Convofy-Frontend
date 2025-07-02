@@ -35,10 +35,10 @@ const CreateMeeting: React.FC = () => {
 
 
 const JoinMeeting: React.FC = () => {
-  const { meetingId } = useParams<{ meetingId: string }>();
+  const { meetid } = useParams<{ meetid: string }>();
   const navigate = useNavigate();
 
-  if (!meetingId) {
+  if (!meetid) {
     navigate("/"); // Redirect to home or another page if `meetingId` is undefined
     return null;
   }
@@ -46,7 +46,7 @@ const JoinMeeting: React.FC = () => {
   return (
     <MeetingProvider
       config={{
-        meetingId: meetingId,
+        meetingId: meetid,
         micEnabled: true,
         webcamEnabled: true,
         name: Cookies.get("name")?.toString() ?? "Guest",
@@ -55,7 +55,7 @@ const JoinMeeting: React.FC = () => {
       token={authToken}
     >
       <MeetingView
-        meetingId={meetingId}
+        meetingId={meetid}
         onMeetingLeave={() => (window.location.href = "/")}
       />
     </MeetingProvider>
