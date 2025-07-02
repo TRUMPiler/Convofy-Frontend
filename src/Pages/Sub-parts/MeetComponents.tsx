@@ -5,7 +5,7 @@ import {
 
 } from "@videosdk.live/react-sdk";
 
-export const authToken: string = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhcGlrZXkiOiIxMmRhZDAzYS1mZTYwLTQzNjgtODI1MS0wYWVhZWU1MWNlOTkiLCJwZXJtaXNzaW9ucyI6WyJhbGxvd19qb2luIl0sImlhdCI6MTc0OTcyOTEzNiwiZXhwIjoxNzgxMjY1MTM2fQ.Da75q68UMwTo325_PgD74qqYj3Ah2Per--IQdU4chNg";
+export const authToken: string = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhcGlrZXkiOiIxMmRhZDAzYS1mZTYwLTQzNjgtODI1MS0wYWVhZWU1MWNlOTkiLCJwZXJtaXNzaW9ucyI6WyJhbGxvd19qb2luIl0sImlhdCI6MTc1MDUzMTkyNCwiZXhwIjoxOTA4MzE5OTI0fQ.f6Rn8tCTjFjmasYajm_DPQq0cyGMk7ftpl8AzeeNiwo";
 
 export const createMeeting = async ({ token }: { token: string }) => {
   const res = await fetch(`https://api.videosdk.live/v2/rooms`, {
