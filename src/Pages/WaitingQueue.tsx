@@ -39,18 +39,22 @@ const WaitingRoom: React.FC = () => {
       debug: (str) => console.log(str),
       onConnect: () => {
         console.log("Connected to WebSocket server");
-        client.subscribe(`/queue/matches/${email}`, (message) => {
+        client.subscribe(`/queue/matches`, (message) => {
           try {
             const data = JSON.parse(message.body);
             console.log("Received WebSocket message:", data);
-            if (data.meetId) {
-              console.log("WebSocket: Match found! Setting status to ready and meetId:", data.meetId);
-              setOtherUserEmail(data.useremail);
-              Cookies.set("matchedEmail", data.useremail);
-              setMeetId(data.meetId);
-              setStatus("ready");
-            } else {
-              console.log("WebSocket: Received message without meetId, ignoring:", data);
+            if (data.userId === email) {
+
+
+              if (data.meetId) {
+                console.log("WebSocket: Match found! Setting status to ready and meetId:", data.meetId);
+                setOtherUserEmail(data.useremail);
+                Cookies.set("matchedEmail", data.useremail);
+                setMeetId(data.meetId);
+                setStatus("ready");
+              } else {
+                console.log("WebSocket: Received message without meetId, ignoring:", data);
+              }
             }
           } catch (error) {
             console.error("Error parsing WebSocket message:", error);
