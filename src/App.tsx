@@ -8,7 +8,7 @@ import CreateMeeting from './Pages/TestingMeet';
 import JoinMeeting from './Pages/TestingMeet';
 import WaitingRoom from './Pages/WaitingQueue';
 import WsChecker from './Pages/WsChecker';
-import JoinMeetingPage from './Pages/JoinMeetingPage';
+// import JoinMeetingPage from './Pages/JoinMeetingPage';
 import InterestsPage from './Pages/InterestPage';
 import ChatroomPage from './Pages/ChatRoom';
 
@@ -25,7 +25,7 @@ function App() {
       <Route path="/WS" element={<WsChecker />} />
       <Route path="/Waiting" element={<WaitingRoom />} />
       <Route path="/create" element={<CreateMeeting />}/>
-      <Route path="/join/:meetid" element={<JoinMeetingPage />} />
+      <Route path="/join/:meetid" element={<JoinMeeting />} />
       <Route path="/Interests" element={<InterestsPage />} />
        <Route path="/ChatRoom/:chatroomId" element={<ChatroomPage/>} />
       </Routes>

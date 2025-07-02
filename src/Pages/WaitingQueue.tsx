@@ -14,6 +14,7 @@ const WaitingRoom: React.FC = () => {
   const [meetId, setMeetId] = useState<string | null>(null);
 
   const initialCheckTriggered = useRef(false);
+  const stompClientRef = useRef<Client | null>(null);
 
   useEffect(() => {
     if (!Cookies.get("email")) {
@@ -24,7 +25,13 @@ const WaitingRoom: React.FC = () => {
   useEffect(() => {
     const email = Cookies.get("email");
     if (!email) {
+      toast.error("Email not found. Please log in.");
+      navigate("/login");
       return;
+    }
+
+    if (stompClientRef.current && stompClientRef.current.active) {
+      stompClientRef.current.deactivate();
     }
 
     const client = new Client({
@@ -37,14 +44,18 @@ const WaitingRoom: React.FC = () => {
             const data = JSON.parse(message.body);
             console.log("Received WebSocket message:", data);
             if (data.meetId) {
+              console.log("WebSocket: Match found! Setting status to ready and meetId:", data.meetId);
               setOtherUserEmail(data.useremail);
               Cookies.set("matchedEmail", data.useremail);
               setMeetId(data.meetId);
               setStatus("ready");
+            } else {
+              console.log("WebSocket: Received message without meetId, ignoring:", data);
             }
           } catch (error) {
             console.error("Error parsing WebSocket message:", error);
             toast.error("Failed to process match data from server.");
+            setStatus("error");
           }
         });
       },
@@ -59,17 +70,21 @@ const WaitingRoom: React.FC = () => {
       }
     });
 
+    stompClientRef.current = client;
     client.activate();
 
     return () => {
-      if (client.active) {
-        client.deactivate();
+      if (stompClientRef.current && stompClientRef.current.active) {
+        console.log("Deactivating STOMP client on component unmount.");
+        stompClientRef.current.deactivate();
       }
     };
-  }, []);
+  }, [navigate]);
 
   const checkQueueStatus = useCallback(async () => {
-    setStatus("Nothing");
+    if (status !== "ready") {
+      setStatus("Nothing");
+    }
     try {
       const email = Cookies.get("email");
       if (!email) {
@@ -78,6 +93,7 @@ const WaitingRoom: React.FC = () => {
         return;
       }
 
+      console.log("Making initial HTTP request to check queue status for:", email);
       const response = await axios.get(`https://api.convofy.fun/api/queue/check/${email}`);
 
       if (response.data.success && response.status === 200) {
@@ -85,6 +101,7 @@ const WaitingRoom: React.FC = () => {
         setOtherUserEmail(matchedEmail);
         Cookies.set("matchedEmail", matchedEmail);
 
+        console.log("HTTP Check: Immediate match found, creating meeting...");
         const createMeetingResponse = await axios.post(
           "https://api.convofy.fun/api/meetings/create",
           { userid1: email, userid2: matchedEmail },
@@ -93,24 +110,30 @@ const WaitingRoom: React.FC = () => {
         console.log("Create meeting response:", createMeetingResponse.data);
         if (createMeetingResponse.data.success) {
           setMeetId(createMeetingResponse.data.data.meetid);
+          console.log("HTTP Check: Meeting created, setting status to ready.");
           setStatus("ready");
         } else {
           toast.error(createMeetingResponse.data.message || "Failed to create meeting.");
           setStatus("error");
         }
       } else if (response.data.success && (response.status === 201 || response.status === 208)) {
-        setStatus("waiting");
-        toast.info("You are in the queue, waiting...");
+        if (status !== "ready") {
+          console.log("HTTP Check: User placed in queue, setting status to waiting.");
+          setStatus("waiting");
+          toast.info("You are in the queue, waiting...");
+        } else {
+          console.log("HTTP Check: User already ready via WebSocket, ignoring 'waiting' status.");
+        }
       } else {
         toast.error(response.data.message || "Failed to check queue status.");
         setStatus("error");
       }
     } catch (error) {
-      console.error("Error checking queue status:", error);
+      console.error("Error checking queue status via HTTP:", error);
       toast.error("An error occurred while checking queue status.");
       setStatus("error");
     }
-  }, []);
+  }, [status]);
 
   useEffect(() => {
     if (!initialCheckTriggered.current) {
@@ -121,11 +144,14 @@ const WaitingRoom: React.FC = () => {
 
   useEffect(() => {
     if (status === "ready" && meetId) {
+      console.log("Navigation useEffect: Status is ready and meetId exists, navigating to:", `/join/${meetId}`);
       const timer = setTimeout(() => {
         navigate(`/join/${meetId}`);
       }, 500);
 
       return () => clearTimeout(timer);
+    } else {
+      console.log("Navigation useEffect: Current Status:", status, "Current MeetId:", meetId);
     }
   }, [status, meetId, navigate]);
 
