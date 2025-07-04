@@ -99,11 +99,12 @@ const LoginPage: React.FC = () => {
                     {/* Google Login */}
                     <GoogleLoginButton />
                     <div className="flex justify-center items-center my-4">
+                    <span className="text-sm text-gray-500">Don't have an account? or Registered with Google?</span>
                     <button
                         className="w-full py-2 bg-blue-600 text-white rounded shadow"
                         onClick={headtowardRegister}
                     >
-                        Register
+                    Register
                     </button>
                     </div>
                 </div>
