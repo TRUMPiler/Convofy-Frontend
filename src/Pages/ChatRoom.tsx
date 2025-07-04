@@ -94,7 +94,7 @@ const ChatroomPage: React.FC = () => {
   }, [onlineUsers]);
 
   useEffect(() => {
-    messageSoundRef.current = new Audio('/src/message-sound.mp3');
+    messageSoundRef.current = new Audio("../assets/message-sound.mp3");
   }, []);
 
   useEffect(() => {
