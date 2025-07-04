@@ -1,25 +1,31 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { Button } from '../Components/ui/button';
 import { ScrollArea } from '../Components/ui/scroll-area';
+import axios from 'axios';
 
 interface Friend {
   id: string;
+  friendInfo: UserBasicInfoDTO;
+}
+
+interface UserBasicInfoDTO {
   userId: string;
-  friendId: string;
-  status: string;
+  name: string;
+  email: string;
+  avatar: string;
 }
 
 interface IncomingFriendRequest {
   requestId: string;
-  senderId: string;
-  senderUsername: string;
+  createdAt: string;
+  sender: UserBasicInfoDTO;
 }
 
 interface OutgoingFriendRequest {
   requestId: string;
-  receiverId: string;
-  receiverUsername: string;
+  createdAt: string;
+  receiver: UserBasicInfoDTO;
 }
 
 interface ApiResponse<T> {
@@ -43,113 +49,89 @@ const FriendListPopup: React.FC<FriendListPopupProps> = ({ isOpen, onClose, curr
 
   const API_BASE_URL = 'https://api.convofy.fun/api/friends';
 
-  useEffect(() => {
-    if (!isOpen || !currentUserId) {
-      return;
-    }
-
-    const fetchFriendData = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const friendsResponse = await fetch(`${API_BASE_URL}/list/${currentUserId}`);
-        if (!friendsResponse.ok) {
-          throw new Error(`HTTP error! status: ${friendsResponse.status}`);
-        }
-        const friendsResult: ApiResponse<Friend[]> = await friendsResponse.json();
-        if (friendsResult.success && friendsResult.data) {
-          setFriends(friendsResult.data);
-        } else {
-          setError(friendsResult.message || 'Failed to fetch friends list');
-        }
-
-        const incomingResponse = await fetch(`${API_BASE_URL}/requests/incoming?userId=${currentUserId}`);
-        if (!incomingResponse.ok) {
-          throw new Error(`HTTP error! status: ${incomingResponse.status}`);
-        }
-        const incomingResult: ApiResponse<IncomingFriendRequest[]> = await incomingResponse.json();
-        if (incomingResult.success && incomingResult.data) {
-          setIncomingRequests(incomingResult.data);
-        } else {
-          setError(prev => prev ? prev + "; " + (incomingResult.message || 'Failed to fetch incoming requests') : (incomingResult.message || 'Failed to fetch incoming requests'));
-        }
-
-        const outgoingResponse = await fetch(`${API_BASE_URL}/requests/outgoing?userId=${currentUserId}`);
-        if (!outgoingResponse.ok) {
-          throw new Error(`HTTP error! status: ${outgoingResponse.status}`);
-        }
-        const outgoingResult: ApiResponse<OutgoingFriendRequest[]> = await outgoingResponse.json();
-        if (outgoingResult.success && outgoingResult.data) {
-          setOutgoingRequests(outgoingResult.data);
-        } else {
-          setError(prev => prev ? prev + "; " + (outgoingResult.message || 'Failed to fetch outgoing requests') : (outgoingResult.message || 'Failed to fetch outgoing requests'));
-        }
-
-      } catch (e: any) {
-        console.error("Error fetching friend data:", e);
-        setError(`Error fetching friend data: ${e.message}`);
-      } finally {
-        setLoading(false);
+  const fetchFriendData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const friendsResponse = await axios.get<ApiResponse<Friend[]>>(`${API_BASE_URL}/list/${currentUserId}`);
+      console.log("friendsResponse.data:", friendsResponse.data);
+      if (friendsResponse.data.success && friendsResponse.data.data) {
+        setFriends(friendsResponse.data.data);
+      } else {
+        setError(prev => prev ? prev + "; " + (friendsResponse.data.message || 'Failed to fetch friends list') : (friendsResponse.data.message || 'Failed to fetch friends list'));
       }
-    };
 
-    fetchFriendData();
-  }, [isOpen, currentUserId, API_BASE_URL]);
+      const incomingResponse = await axios.get<ApiResponse<IncomingFriendRequest[]>>(`${API_BASE_URL}/requests/incoming?userId=${currentUserId}`);
+      if (incomingResponse.data.success && incomingResponse.data.data) {
+        setIncomingRequests(incomingResponse.data.data);
+      } else {
+        setError(prev => prev ? prev + "; " + (incomingResponse.data.message || 'Failed to fetch incoming requests') : (incomingResponse.data.message || 'Failed to fetch incoming requests'));
+      }
+
+      const outgoingResponse = await axios.get<ApiResponse<OutgoingFriendRequest[]>>(`${API_BASE_URL}/requests/outgoing?userId=${currentUserId}`);
+      if (outgoingResponse.data.success && outgoingResponse.data.data) {
+        setOutgoingRequests(outgoingResponse.data.data);
+      } else {
+        setError(prev => prev ? prev + "; " + (outgoingResponse.data.message || 'Failed to fetch outgoing requests') : (outgoingResponse.data.message || 'Failed to fetch outgoing requests'));
+      }
+
+    } catch (e: any) {
+      console.error("Error fetching friend data:", e);
+      if (axios.isAxiosError(e) && e.response) {
+        setError(`Error fetching friend data: ${e.response.status} - ${e.response.data?.message || e.message}`);
+      } else {
+        setError(`Error fetching friend data: ${e.message}`);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [currentUserId, API_BASE_URL]);
+
+  useEffect(() => {
+    if (isOpen && currentUserId) {
+      fetchFriendData();
+    }
+  }, [isOpen, currentUserId, fetchFriendData]);
 
   const handleAcceptRequest = async (requestId: string) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/update/${requestId}?currentuserid=${currentUserId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      const result: ApiResponse<string> = await response.json();
-      if (result.success) {
-        const friendsResponse = await fetch(`${API_BASE_URL}/list/${currentUserId}`);
-        const friendsResult: ApiResponse<Friend[]> = await friendsResponse.json();
-        if (friendsResult.success && friendsResult.data) {
-          setFriends(friendsResult.data);
-        }
+      const response = await axios.put<ApiResponse<string>>(`${API_BASE_URL}/update/${requestId}?currentuserid=${currentUserId}`);
+      const result = response.data;
 
-        const incomingResponse = await fetch(`${API_BASE_URL}/requests/incoming?userId=${currentUserId}`);
-        const incomingResult: ApiResponse<IncomingFriendRequest[]> = await incomingResponse.json();
-        if (incomingResult.success && incomingResult.data) {
-          setIncomingRequests(incomingResult.data);
-        }
+      if (result.success) {
+        fetchFriendData();
       } else {
         setError(result.message || 'Failed to accept friend request');
       }
     } catch (e: any) {
       console.error("Error accepting request:", e);
-      setError(`Error accepting request: ${e.message}`);
+      if (axios.isAxiosError(e) && e.response) {
+        setError(`Error accepting request: ${e.response.status} - ${e.response.data?.message || e.message}`);
+      } else {
+        setError(`Error accepting request: ${e.message}`);
+      }
     }
   };
 
   const handleUnfriend = async (friendIdToUnfriend: string) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/unfriend`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ userId: currentUserId, friendId: friendIdToUnfriend }),
+      const response = await axios.delete<ApiResponse<string>>(`${API_BASE_URL}/unfriend`, {
+        data: { userId: currentUserId, friendId: friendIdToUnfriend },
       });
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      const result: ApiResponse<string> = await response.json();
+      const result = response.data;
+
       if (result.success) {
-        setFriends(friends.filter(f => f.friendId !== friendIdToUnfriend && f.userId !== friendIdToUnfriend));
+        fetchFriendData();
       } else {
         setError(result.message || 'Failed to unfriend');
       }
     } catch (e: any) {
       console.error("Error unfriending:", e);
-      setError(`Error unfriending: ${e.message}`);
+      if (axios.isAxiosError(e) && e.response) {
+        setError(`Error unfriending: ${e.response.status} - ${e.response.data?.message || e.message}`);
+      } else {
+        setError(`Error unfriending: ${e.message}`);
+      }
     }
   };
 
@@ -176,12 +158,12 @@ const FriendListPopup: React.FC<FriendListPopupProps> = ({ isOpen, onClose, curr
                 {friends.map((friend) => (
                   <li key={friend.id} className="flex items-center justify-between p-2 border rounded-md bg-gray-50">
                     <span className="font-medium text-gray-800">
-                      {friend.userId === currentUserId ? `Friend ID: ${friend.friendId}` : `Friend ID: ${friend.userId}`}
+                      {friend.friendInfo.name || `ID: ${friend.friendInfo.userId}`}
                     </span>
                     <Button
                       variant="destructive"
                       size="sm"
-                      onClick={() => handleUnfriend(friend.userId === currentUserId ? friend.friendId : friend.userId)}
+                      onClick={() => handleUnfriend(friend.friendInfo.userId)}
                       className="bg-red-500 hover:bg-red-600 text-white rounded-md px-3 py-1"
                     >
                       Unfriend
@@ -201,7 +183,7 @@ const FriendListPopup: React.FC<FriendListPopupProps> = ({ isOpen, onClose, curr
                 {incomingRequests.map((request) => (
                   <li key={request.requestId} className="flex items-center justify-between p-2 border rounded-md bg-yellow-50">
                     <span className="font-medium text-gray-800">
-                      From: {request.senderUsername || request.senderId}
+                      From: {request.sender.name || request.sender.userId}
                     </span>
                     <Button
                       variant="default"
@@ -226,7 +208,7 @@ const FriendListPopup: React.FC<FriendListPopupProps> = ({ isOpen, onClose, curr
                 {outgoingRequests.map((request) => (
                   <li key={request.requestId} className="flex items-center justify-between p-2 border rounded-md bg-blue-50">
                     <span className="font-medium text-gray-800">
-                      To: {request.receiverUsername || request.receiverId}
+                      To: {request.receiver.name || request.receiver.userId}
                     </span>
                     <Button
                       variant="outline"
