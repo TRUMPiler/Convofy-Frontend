@@ -8,6 +8,9 @@ import { Stomp } from '@stomp/stompjs';
 import Cookies from 'js-cookie';
 import UserProfileModal from '../Components/UserProfileModal';
 
+// Import the sound file directly. Vite/Webpack will process this and give you a URL.
+
+
 interface Interest {
   interestId: string;
   name: string;
@@ -32,22 +35,6 @@ interface ChatMessageResponse {
   time: string;
 }
 
-const isImageOrGifUrl = (url: string): boolean => {
-  if (!url || typeof url !== 'string') {
-    return false;
-  }
-  const imageRegex = /\.(jpeg|jpg|png|gif|webp|bmp|svg)$/i;
-  try {
-    const parsedUrl = new URL(url);
-    return imageRegex.test(parsedUrl.pathname) ||
-           parsedUrl.hostname.includes('imgur.com') ||
-           parsedUrl.hostname.includes('giphy.com') ||
-           parsedUrl.hostname.includes('tenor.com');
-  } catch (e) {
-    return false;
-  }
-};
-
 const ChatroomPage: React.FC = () => {
   const { chatroomId } = useParams<{ chatroomId: string }>();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -59,7 +46,7 @@ const ChatroomPage: React.FC = () => {
   const [newMessageText, setNewMessageText] = useState<string>('');
   const stompClient = useRef<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const messageSoundRef = useRef<HTMLAudioElement | null>(null);
+  const audioRef = useRef<HTMLAudioElement>(null); // Ref for the audio element
 
   const [selectedUser, setSelectedUser] = useState<OnlineUser | ChatMessageResponse | null>(null);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -85,6 +72,22 @@ const ChatroomPage: React.FC = () => {
     return '';
   };
 
+  // Function to play the message sound
+  const playMessageSound = () => {
+    if (audioRef.current) {
+      audioRef.current.currentTime = 0; // Rewind to the start
+      audioRef.current.play().catch(error => {
+        console.error('Error playing sound:', error);
+        // This catch block will specifically handle the NotSupportedError
+        // or other playback issues like user gesture requirements.
+        if (error.name === 'NotSupportedError' || error.name === 'AbortError') {
+          console.warn('Audio playback prevented. User interaction might be required.');
+          // You might show a subtle message to the user here, e.g., "Click anywhere to enable sound"
+        }
+      });
+    }
+  };
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
@@ -92,10 +95,6 @@ const ChatroomPage: React.FC = () => {
   useEffect(() => {
     console.log('onlineUsers state updated:', onlineUsers);
   }, [onlineUsers]);
-
-  useEffect(() => {
-    messageSoundRef.current = new Audio("../assets/message-sound.mp3");
-  }, []);
 
   useEffect(() => {
     const fetchChatHistory = async () => {
@@ -165,9 +164,11 @@ const ChatroomPage: React.FC = () => {
 
       stompClient.current.subscribe(`/topic/chatroom/${chatroomId}/messages`, (message: any) => {
         const receivedMessage: ChatMessageResponse = JSON.parse(message.body);
+        console.log('Received new message:', receivedMessage);
         setMessages((prevMessages) => {
-          if (receivedMessage.userId !== currentUserId && messageSoundRef.current) {
-            messageSoundRef.current.play().catch(e => console.error("Error playing sound:", e));
+          // Play sound only if the message is not from the current user
+          if (receivedMessage.userId !== currentUserId) {
+            playMessageSound();
           }
           return [...prevMessages, receivedMessage];
         });
@@ -200,7 +201,7 @@ const ChatroomPage: React.FC = () => {
         });
       }
     };
-  }, [chatroomId, currentUserId]);
+  }, [chatroomId, currentUserId]); // Added currentUserId to dependencies to ensure correct sound playing logic
 
   useEffect(() => {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -402,8 +403,6 @@ const ChatroomPage: React.FC = () => {
             ) : (
               messages.map((msg) => {
                 const isOwnMessage = msg.userId === currentUserId;
-                const isMediaMessage = isImageOrGifUrl(msg.text);
-
                 return (
                   <div
                     key={msg.id}
@@ -442,33 +441,14 @@ const ChatroomPage: React.FC = () => {
                           <span className="font-semibold text-blue-500">You</span>
                         )}
                       </div>
-                      <div
+                      <p
                         className={`
                             rounded-lg px-4 py-2 text-foreground break-words max-w-lg shadow-sm
                             ${isOwnMessage ? 'bg-blue-600 text-white' : 'bg-secondary'}
                           `}
                       >
-                        {isMediaMessage ? (
-                          <a href={msg.text} target="_blank" rel="noopener noreferrer">
-                            <img
-                              src={msg.text}
-                              alt="Shared content"
-                              className="max-w-xs md:max-w-sm lg:max-w-md h-auto rounded-md object-cover cursor-pointer"
-                              onError={(e) => {
-                                e.currentTarget.style.display = 'none';
-                                const parent = e.currentTarget.parentElement;
-                                if (parent) {
-                                  const textNode = document.createElement('span');
-                                  textNode.textContent = msg.text;
-                                  parent.appendChild(textNode);
-                                }
-                              }}
-                            />
-                          </a>
-                        ) : (
-                          <p>{msg.text}</p>
-                        )}
-                      </div>
+                        {msg.text}
+                      </p>
                     </div>
                   </div>
                 );
@@ -504,6 +484,8 @@ const ChatroomPage: React.FC = () => {
       <footer className="p-4 text-center text-muted-foreground text-sm border-t border-border">
         &copy; {new Date().getFullYear()} Convofy.
       </footer>
+
+      <audio ref={audioRef} src="/message-sound.mp3" preload="auto" />
 
       {isProfileModalOpen && selectedUser && (
         <UserProfileModal
