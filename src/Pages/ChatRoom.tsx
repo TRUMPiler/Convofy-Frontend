@@ -32,22 +32,18 @@ interface ChatMessageResponse {
   time: string;
 }
 
-// Function to check if a URL is an image or GIF
 const isImageOrGifUrl = (url: string): boolean => {
   if (!url || typeof url !== 'string') {
     return false;
   }
-  // Regex to check for common image/gif extensions
   const imageRegex = /\.(jpeg|jpg|png|gif|webp|bmp|svg)$/i;
   try {
     const parsedUrl = new URL(url);
-    // Check path extension or common image/GIF hosting domains
     return imageRegex.test(parsedUrl.pathname) ||
            parsedUrl.hostname.includes('imgur.com') ||
            parsedUrl.hostname.includes('giphy.com') ||
            parsedUrl.hostname.includes('tenor.com');
   } catch (e) {
-    // If URL parsing fails, it's not a valid URL
     return false;
   }
 };
@@ -63,8 +59,9 @@ const ChatroomPage: React.FC = () => {
   const [newMessageText, setNewMessageText] = useState<string>('');
   const stompClient = useRef<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const messageSoundRef = useRef<HTMLAudioElement | null>(null); // Ref for the Audio object
-  const [audioUnlocked, setAudioUnlocked] = useState(false); // State to track if audio is unlocked
+  const messageSoundRef = useRef<HTMLAudioElement | null>(null);
+  const [audioUnlocked, setAudioUnlocked] = useState(false);
+  const [isHistoryLoaded, setIsHistoryLoaded] = useState(false);
 
   const [selectedUser, setSelectedUser] = useState<OnlineUser | ChatMessageResponse | null>(null);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -90,16 +87,14 @@ const ChatroomPage: React.FC = () => {
     return '';
   };
 
-  // Initialize Audio object once on component mount
   useEffect(() => {
     messageSoundRef.current = new Audio('/message-sound.mp3');
-    messageSoundRef.current.preload = 'auto'; // Ensure it's preloaded
+    messageSoundRef.current.preload = 'auto';
   }, []);
 
-  // Function to play the message sound
   const playMessageSound = () => {
-    if (messageSoundRef.current && audioUnlocked) { // Only attempt to play if audio is unlocked
-      messageSoundRef.current.currentTime = 0; // Rewind to the start
+    if (messageSoundRef.current && audioUnlocked) {
+      messageSoundRef.current.currentTime = 0;
       messageSoundRef.current.play().catch(error => {
         console.error('Error playing sound:', error);
         if (error.name === 'NotSupportedError' || error.name === 'AbortError') {
@@ -111,24 +106,21 @@ const ChatroomPage: React.FC = () => {
     }
   };
 
-  // Effect to scroll to the bottom of messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Effect to log online users update
   useEffect(() => {
     console.log('onlineUsers state updated:', onlineUsers);
   }, [onlineUsers]);
 
-  // Effect to handle audio unlocking on first user interaction
   useEffect(() => {
     const unlockAudio = () => {
       if (!audioUnlocked && messageSoundRef.current) {
-        messageSoundRef.current.volume = 0; // Temporarily set volume to 0
+        messageSoundRef.current.volume = 0;
         messageSoundRef.current.play().then(() => {
           setAudioUnlocked(true);
-          messageSoundRef.current!.volume = 1; // Restore volume
+          messageSoundRef.current!.volume = 1;
           console.log("Audio unlocked successfully!");
         }).catch(error => {
           console.warn("Could not unlock audio automatically:", error);
@@ -147,7 +139,6 @@ const ChatroomPage: React.FC = () => {
     };
   }, [audioUnlocked]);
 
-  // Effect to fetch chat history
   useEffect(() => {
     const fetchChatHistory = async () => {
       if (!chatroomId) {
@@ -170,6 +161,7 @@ const ChatroomPage: React.FC = () => {
 
         if (response.data.success && response.data.data) {
           setMessages(response.data.data.reverse());
+          setIsHistoryLoaded(true);
           console.log('Chat history fetched:', response.data.data);
         } else {
           toast.error(response.data.message || 'Failed to fetch chat history. Please ensure your backend is running and the /api/chat/history/{chatroomId} endpoint is correctly implemented.', { duration: 5000 });
@@ -185,7 +177,6 @@ const ChatroomPage: React.FC = () => {
     fetchChatHistory();
   }, [chatroomId, currentUserId]);
 
-  // Effect to handle WebSocket connection and subscriptions
   useEffect(() => {
     if (!chatroomId) {
       console.error('No chatroomId available for WebSocket connection.');
@@ -219,7 +210,7 @@ const ChatroomPage: React.FC = () => {
         const receivedMessage: ChatMessageResponse = JSON.parse(message.body);
         console.log('Received new message:', receivedMessage);
         setMessages((prevMessages) => {
-          if (receivedMessage.userId !== currentUserId) {
+          if (isHistoryLoaded && receivedMessage.userId !== currentUserId) {
             playMessageSound();
           }
           return [...prevMessages, receivedMessage];
@@ -253,9 +244,8 @@ const ChatroomPage: React.FC = () => {
         });
       }
     };
-  }, [chatroomId, currentUserId, audioUnlocked]);
+  }, [chatroomId, currentUserId, audioUnlocked, isHistoryLoaded]);
 
-  // Effect to handle beforeunload event for leaving chatroom
   useEffect(() => {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
       if (stompClient.current && stompClient.current.connected) {
@@ -286,7 +276,6 @@ const ChatroomPage: React.FC = () => {
     };
   }, [chatroomId]);
 
-  // Effect to fetch chatroom details
   useEffect(() => {
     const fetchChatroomDetails = async () => {
       if (!chatroomId) {
