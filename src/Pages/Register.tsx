@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import axios from "axios";
 import { toast } from "sonner";
-import GoogleRegisterButton from "./Sub-parts/GoogleRegisterButton"; // Import the GoogleRegisterButton component
+import GoogleRegisterButton from "./Sub-parts/GoogleRegisterButton";
 import Navbar from "./Sub-parts/NavigationBar";
 import Cookies from "js-cookie";
 
@@ -12,7 +12,7 @@ const RegistrationPage: React.FC = () => {
         password: "",
         confirmPassword: "",
         phone: "",
-        image: "", // This field isn't used in the backend /api/users endpoint for now, but kept for consistency
+        image: "",
     });
     
     const headtowardLogin = () => {
@@ -26,7 +26,7 @@ const RegistrationPage: React.FC = () => {
 
     const handleRegister = async (e: React.FormEvent) => {
         e.preventDefault();
-        const { name, email, password, confirmPassword, phone, image } = formData; // Include image in destructuring
+        const { name, email, password, confirmPassword, phone, image } = formData;
 
         if (password !== confirmPassword) {
             toast.error("Passwords do not match!", { className: "error" });
@@ -36,7 +36,7 @@ const RegistrationPage: React.FC = () => {
         try {
             const response = await axios.post(
                 "https://api.convofy.fun/api/users",
-                { name, email, password, phone, image }, // Send image if you want it to be part of registration
+                { name, email, password, phone, image },
                 { headers: { "Content-Type": "application/json" } }
             );
 
@@ -45,12 +45,11 @@ const RegistrationPage: React.FC = () => {
             if (response.data.success && response.data.data) {
                 const { jwt, userId, name: userName, email: userEmail, image: userImage } = response.data.data;
 
-                // Store JWT in a cookie
-                Cookies.set('jwtToken', jwt, { expires: 1/2 }); // Expires in 12 hours (1/2 day)
+                Cookies.set('jwtToken', jwt, { expires: 1/2 });
                 Cookies.set('userId', userId.toString());
-                Cookies.set('name', userName || name); // Use name from backend response, fallback to form data
-                Cookies.set('email', userEmail || email); // Use email from backend response, fallback to form data
-                Cookies.set('avatar', userImage ?? 'https://github.com/shadcn.png'); // Use image from backend, fallback to default
+                Cookies.set('name', userName || name);
+                Cookies.set('email', userEmail || email);
+                Cookies.set('avatar', userImage ?? 'https://github.com/shadcn.png');
 
                 toast.success("Registration Successful! Welcome to the platform.", {
                     className: "success",
@@ -66,11 +65,10 @@ const RegistrationPage: React.FC = () => {
             }
         } catch (error: any) {
             console.error("Registration error:", error);
-            if (error.response && error.response.status === 409) {
+            if (axios.isAxiosError(error) && error.response && error.response.status === 409) {
                 toast.error("Email already exists. Please use a different email.", {
                     className: "error",
                 });
-                // No immediate redirect to login here, user might want to try another email
             } else {
                 toast.error("An error occurred during registration. Please try again.", {
                     className: "error",
@@ -83,99 +81,110 @@ const RegistrationPage: React.FC = () => {
         <>
             <Navbar />
             <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">
-                <h1 className="text-2xl font-bold mb-6">Register</h1>
+                <div className="w-full max-w-md bg-white p-6 rounded-lg shadow-lg">
+                    <h1 className="text-3xl font-bold mb-6 text-center text-gray-800">Create Your Account</h1>
 
-                <form
-                    className="w-full max-w-md bg-white p-6 rounded shadow-md"
-                    onSubmit={handleRegister}
-                >
-                    <div className="mb-4">
-                        <label className="block text-gray-700 mb-1">Name</label>
-                        <input
-                            type="text"
-                            name="name"
-                            value={formData.name}
-                            onChange={handleInputChange}
-                            className="w-full px-3 py-2 border rounded"
-                            required
-                        />
-                    </div>
-                    <div className="mb-4">
-                        <label className="block text-gray-700 mb-1">Email</label>
-                        <input
-                            type="email"
-                            name="email"
-                            value={formData.email}
-                            onChange={handleInputChange}
-                            className="w-full px-3 py-2 border rounded"
-                            required
-                        />
-                    </div>
-                    <div className="mb-4">
-                        <label className="block text-gray-700 mb-1">Password</label>
-                        <input
-                            type="password"
-                            name="password"
-                            value={formData.password}
-                            onChange={handleInputChange}
-                            className="w-full px-3 py-2 border rounded"
-                            required
-                        />
-                    </div>
-                    <div className="mb-4">
-                        <label className="block text-gray-700 mb-1">Confirm Password</label>
-                        <input
-                            type="password"
-                            name="confirmPassword"
-                            value={formData.confirmPassword}
-                            onChange={handleInputChange}
-                            className="w-full px-3 py-2 border rounded"
-                            required
-                        />
-                    </div>
-                    <div className="mb-4">
-                        <label className="block text-gray-700 mb-1">Phone</label>
-                        <input
-                            type="tel"
-                            name="phone"
-                            value={formData.phone}
-                            onChange={handleInputChange}
-                            className="w-full px-3 py-2 border rounded"
-                        />
-                    </div>
-                    {/* Optional: Add an input for image URL if you want users to set it during registration */}
-                    <div className="mb-4">
-                        <label className="block text-gray-700 mb-1">Profile Image URL (Optional)</label>
-                        <input
-                            type="url"
-                            name="image"
-                            value={formData.image}
-                            onChange={handleInputChange}
-                            className="w-full px-3 py-2 border rounded"
-                            placeholder="e.g., https://example.com/your-pic.jpg"
-                        />
-                    </div>
-                    <button
-                        type="submit"
-                        className="w-full py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                    >
-                        Register
-                    </button>
+                    <form onSubmit={handleRegister}>
+                        <div className="mb-4">
+                            <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                            <input
+                                type="text"
+                                id="name"
+                                name="name"
+                                value={formData.name}
+                                onChange={handleInputChange}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                                required
+                            />
+                        </div>
+                        <div className="mb-4">
+                            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                            <input
+                                type="email"
+                                id="email"
+                                name="email"
+                                value={formData.email}
+                                onChange={handleInputChange}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                                required
+                            />
+                        </div>
+                        <div className="mb-4">
+                            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                            <input
+                                type="password"
+                                id="password"
+                                name="password"
+                                value={formData.password}
+                                onChange={handleInputChange}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                                required
+                            />
+                        </div>
+                        <div className="mb-4">
+                            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
+                            <input
+                                type="password"
+                                id="confirmPassword"
+                                name="confirmPassword"
+                                value={formData.confirmPassword}
+                                onChange={handleInputChange}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                                required
+                            />
+                        </div>
+                        <div className="mb-6">
+                            <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">Phone (Optional)</label>
+                            <input
+                                type="tel"
+                                id="phone"
+                                name="phone"
+                                value={formData.phone}
+                                onChange={handleInputChange}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                                placeholder="e.g., +1234567890"
+                            />
+                        </div>
+                        <div className="mb-6">
+                            <label htmlFor="image" className="block text-sm font-medium text-gray-700 mb-1">Profile Image URL (Optional)</label>
+                            <input
+                                type="url"
+                                id="image"
+                                name="image"
+                                value={formData.image}
+                                onChange={handleInputChange}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                                placeholder="e.g., https://example.com/your-pic.jpg"
+                            />
+                        </div>
+                        <button
+                            type="submit"
+                            className="w-full py-3 bg-blue-600 text-white font-semibold rounded-md shadow-md hover:bg-blue-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                        >
+                            Register
+                        </button>
+                    </form>
 
-                    <div className="flex justify-center items-center my-4">
-                        <span className="text-sm text-gray-500">or</span>
+                    <div className="flex items-center my-6">
+                        <div className="flex-grow border-t border-gray-300"></div>
+                        <span className="flex-shrink mx-4 text-gray-500 text-sm">or</span>
+                        <div className="flex-grow border-t border-gray-300"></div>
                     </div>
-                    <button
-                        className="w-full py-2 bg-blue-600 text-white rounded shadow "
-                        onClick={headtowardLogin}
-                    >
-                        Login?
-                    </button>
-                </form>
 
-                <div className="my-4">
-                    <p className="text-gray-600">Or Register Using Google</p>
-                    <GoogleRegisterButton />
+                    <div className="mb-6">
+                        <p className="text-center text-gray-600 mb-3">Continue with Google</p>
+                        <GoogleRegisterButton />
+                    </div>
+
+                    <div className="text-center mt-6">
+                        <p className="text-gray-700 mb-2">Already have an account?</p>
+                        <button
+                            className="w-full py-2 bg-white text-blue-600 border border-blue-600 rounded-md shadow-sm hover:bg-blue-50 hover:border-blue-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                            onClick={headtowardLogin}
+                        >
+                            Log In
+                        </button>
+                    </div>
                 </div>
             </div>
         </>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import GoogleLoginButton from './Sub-parts/GoogleLoginButton'; // Import the Google login button
+import GoogleLoginButton from './Sub-parts/GoogleLoginButton';
 import axios from 'axios';
 import { toast } from 'sonner';
 import Cookies from 'js-cookie';
@@ -23,30 +23,28 @@ const LoginPage: React.FC = () => {
                 { headers: { 'Content-Type': 'application/json' } }    
             );
             
-            // Log the full response data for debugging
             console.log("Login Response Data:", response.data); 
 
             if (response.data.success && response.data.data) {
                 const { jwt, userId, name, email: userEmail, image } = response.data.data;
 
-                // Store JWT in a cookie
-                Cookies.set('jwtToken', jwt, { expires: 1/2 }); // Expires in 12 hours (1/2 day)
+                Cookies.set('jwtToken', jwt, { expires: 1/2 });
                 Cookies.set('userId', userId.toString());
                 Cookies.set('name', name.toString());
-                Cookies.set('email', userEmail.toString()); // Use userEmail to avoid conflict with useState email
+                Cookies.set('email', userEmail.toString());
                 Cookies.set('avatar', image ?? 'https://github.com/shadcn.png');
 
                 toast.success('Login Successful! Welcome back!', { className: 'success' });
                 
                 setTimeout(() => {
-                    window.location.href = './'; // Redirect to home page
+                    window.location.href = './';
                 }, 1500);
             } else {
                 toast.error(response.data.message || 'Invalid email or password. Please try again.', { className: 'error' });
             }
         } catch (error: any) {
             console.error('Error during login:', error);
-            if (error.response && error.response.status === 401) {
+            if (axios.isAxiosError(error) && error.response && error.response.status === 401) {
                 toast.error('Invalid email or password. Please try again.', { className: 'error' });
             } else {
                 toast.error('An error occurred. Please try again later.', { className: 'error' });
@@ -63,7 +61,6 @@ const LoginPage: React.FC = () => {
                 <div className="bg-white rounded shadow-lg p-6 w-full max-w-sm">
                     <h1 className="text-2xl font-bold mb-6 text-center">Login</h1>
 
-                    {/* Standard Login Form */}
                     <div className="mb-4">
                         <label className="block text-sm font-medium text-gray-700">Email</label>
                         <input
@@ -85,7 +82,7 @@ const LoginPage: React.FC = () => {
                         />
                     </div>
                     <button
-                        className="w-full py-2 bg-blue-600 text-white rounded shadow"
+                        className="w-full py-2 bg-blue-600 text-white rounded shadow hover:bg-blue-700 transition-colors duration-200"
                         onClick={handleLogin}
                         disabled={loading}
                     >
@@ -95,17 +92,20 @@ const LoginPage: React.FC = () => {
                     <div className="flex justify-center items-center my-4">
                         <span className="text-sm text-gray-500">or</span>
                     </div>
-
-                    {/* Google Login */}
+                    
                     <GoogleLoginButton />
-                    <div className="flex justify-center items-center my-4">
-                    <span className="text-sm text-gray-500">Don't have an account? or Registered with Google?</span>
-                    <button
-                        className="w-full py-2 bg-blue-600 text-white rounded shadow"
-                        onClick={headtowardRegister}
-                    >
-                    Register
-                    </button>
+
+                    {/* New and improved registration section */}
+                    <div className="mt-6 text-center">
+                        <p className="text-base text-gray-700 mb-3 font-semibold">
+                            New to Convofy?
+                        </p>
+                        <button
+                            className="w-full py-2 bg-green-500 text-white rounded shadow hover:bg-green-600 transition-colors duration-200 transform hover:scale-105"
+                            onClick={headtowardRegister}
+                        >
+                            Create an Account
+                        </button>
                     </div>
                 </div>
             </div>
