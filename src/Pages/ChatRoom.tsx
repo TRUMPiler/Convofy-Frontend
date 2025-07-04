@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import SockJS from 'sockjs-client';
 import { Stomp } from '@stomp/stompjs';
 import Cookies from 'js-cookie';
-import UserProfileModal from '../Components/UserProfileModal'; 
+import UserProfileModal from '../Components/UserProfileModal';
 
 interface Interest {
   interestId: string;
@@ -31,6 +31,25 @@ interface ChatMessageResponse {
   text: string;
   time: string;
 }
+
+// Helper function to check if a URL is an image or GIF
+const isImageOrGifUrl = (url: string): boolean => {
+  if (!url || typeof url !== 'string') {
+    return false;
+  }
+  const imageRegex = /\.(jpeg|jpg|png|gif|webp|bmp|svg)$/i;
+  try {
+    const parsedUrl = new URL(url);
+    return imageRegex.test(parsedUrl.pathname) ||
+           // Also consider common direct image hosting services without explicit extensions in path
+           parsedUrl.hostname.includes('imgur.com') ||
+           parsedUrl.hostname.includes('giphy.com') ||
+           parsedUrl.hostname.includes('tenor.com'); // Add more as needed
+  } catch (e) {
+    return false;
+  }
+};
+
 
 const ChatroomPage: React.FC = () => {
   const { chatroomId } = useParams<{ chatroomId: string }>();
@@ -379,6 +398,8 @@ const ChatroomPage: React.FC = () => {
             ) : (
               messages.map((msg) => {
                 const isOwnMessage = msg.userId === currentUserId;
+                const isMediaMessage = isImageOrGifUrl(msg.text); // Check if the message text is a media URL
+
                 return (
                   <div
                     key={msg.id}
@@ -417,14 +438,36 @@ const ChatroomPage: React.FC = () => {
                           <span className="font-semibold text-blue-500">You</span>
                         )}
                       </div>
-                      <p
+                      <div
                         className={`
                             rounded-lg px-4 py-2 text-foreground break-words max-w-lg shadow-sm
                             ${isOwnMessage ? 'bg-blue-600 text-white' : 'bg-secondary'}
                           `}
                       >
-                        {msg.text}
-                      </p>
+                        {isMediaMessage ? (
+                          // Render image if it's a media message
+                          <a href={msg.text} target="_blank" rel="noopener noreferrer">
+                            <img
+                              src={msg.text}
+                              alt="Shared content"
+                              className="max-w-xs md:max-w-sm lg:max-w-md h-auto rounded-md object-cover cursor-pointer"
+                              onError={(e) => {
+                                // Fallback to displaying the URL as text if image fails to load
+                                e.currentTarget.style.display = 'none'; // Hide broken image
+                                const parent = e.currentTarget.parentElement;
+                                if (parent) {
+                                  const textNode = document.createElement('span');
+                                  textNode.textContent = msg.text;
+                                  parent.appendChild(textNode);
+                                }
+                              }}
+                            />
+                          </a>
+                        ) : (
+                          // Otherwise, render as plain text
+                          <p>{msg.text}</p>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );
