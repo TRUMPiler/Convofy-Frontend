@@ -32,7 +32,6 @@ interface ChatMessageResponse {
   time: string;
 }
 
-// Helper function to check if a URL is an image or GIF
 const isImageOrGifUrl = (url: string): boolean => {
   if (!url || typeof url !== 'string') {
     return false;
@@ -41,15 +40,13 @@ const isImageOrGifUrl = (url: string): boolean => {
   try {
     const parsedUrl = new URL(url);
     return imageRegex.test(parsedUrl.pathname) ||
-           // Also consider common direct image hosting services without explicit extensions in path
            parsedUrl.hostname.includes('imgur.com') ||
            parsedUrl.hostname.includes('giphy.com') ||
-           parsedUrl.hostname.includes('tenor.com'); // Add more as needed
+           parsedUrl.hostname.includes('tenor.com');
   } catch (e) {
     return false;
   }
 };
-
 
 const ChatroomPage: React.FC = () => {
   const { chatroomId } = useParams<{ chatroomId: string }>();
@@ -62,8 +59,8 @@ const ChatroomPage: React.FC = () => {
   const [newMessageText, setNewMessageText] = useState<string>('');
   const stompClient = useRef<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messageSoundRef = useRef<HTMLAudioElement | null>(null);
 
-  // State for User Profile Modal
   const [selectedUser, setSelectedUser] = useState<OnlineUser | ChatMessageResponse | null>(null);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
@@ -95,6 +92,10 @@ const ChatroomPage: React.FC = () => {
   useEffect(() => {
     console.log('onlineUsers state updated:', onlineUsers);
   }, [onlineUsers]);
+
+  useEffect(() => {
+    messageSoundRef.current = new Audio('/src/message-sound.mp3');
+  }, []);
 
   useEffect(() => {
     const fetchChatHistory = async () => {
@@ -164,8 +165,12 @@ const ChatroomPage: React.FC = () => {
 
       stompClient.current.subscribe(`/topic/chatroom/${chatroomId}/messages`, (message: any) => {
         const receivedMessage: ChatMessageResponse = JSON.parse(message.body);
-        console.log('Received new message:', receivedMessage);
-        setMessages((prevMessages) => [...prevMessages, receivedMessage]);
+        setMessages((prevMessages) => {
+          if (receivedMessage.userId !== currentUserId && messageSoundRef.current) {
+            messageSoundRef.current.play().catch(e => console.error("Error playing sound:", e));
+          }
+          return [...prevMessages, receivedMessage];
+        });
       }, headers);
 
       setTimeout(() => {
@@ -195,7 +200,7 @@ const ChatroomPage: React.FC = () => {
         });
       }
     };
-  }, [chatroomId]);
+  }, [chatroomId, currentUserId]);
 
   useEffect(() => {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -268,7 +273,6 @@ const ChatroomPage: React.FC = () => {
     setIsSidebarOpen(!isSidebarOpen);
   };
 
-  // Functions to open and close the User Profile Modal
   const openProfileModal = (user: OnlineUser | ChatMessageResponse) => {
     setSelectedUser(user);
     setIsProfileModalOpen(true);
@@ -359,7 +363,7 @@ const ChatroomPage: React.FC = () => {
                 <div
                   key={user.userId}
                   className="flex items-center space-x-3 cursor-pointer hover:bg-secondary/50 rounded-md p-1 -ml-1 transition-colors duration-200"
-                  onClick={() => openProfileModal(user)} // Clickable user in sidebar
+                  onClick={() => openProfileModal(user)}
                 >
                   <img
                     src={user.avatar}
@@ -398,7 +402,7 @@ const ChatroomPage: React.FC = () => {
             ) : (
               messages.map((msg) => {
                 const isOwnMessage = msg.userId === currentUserId;
-                const isMediaMessage = isImageOrGifUrl(msg.text); // Check if the message text is a media URL
+                const isMediaMessage = isImageOrGifUrl(msg.text);
 
                 return (
                   <div
@@ -411,7 +415,7 @@ const ChatroomPage: React.FC = () => {
                         alt={msg.userName}
                         className="w-8 h-8 rounded-full object-cover flex-shrink-0 border border-border cursor-pointer"
                         referrerPolicy='no-referrer'
-                        onClick={() => openProfileModal(msg)} // Clickable avatar in chat
+                        onClick={() => openProfileModal(msg)}
                       />
                     )}
 
@@ -430,7 +434,7 @@ const ChatroomPage: React.FC = () => {
                         {!isOwnMessage ? (
                           <span
                             className="font-semibold text-primary cursor-pointer hover:underline"
-                            onClick={() => openProfileModal(msg)} // Clickable username in chat
+                            onClick={() => openProfileModal(msg)}
                           >
                             {msg.userName}
                           </span>
@@ -445,15 +449,13 @@ const ChatroomPage: React.FC = () => {
                           `}
                       >
                         {isMediaMessage ? (
-                          // Render image if it's a media message
                           <a href={msg.text} target="_blank" rel="noopener noreferrer">
                             <img
                               src={msg.text}
                               alt="Shared content"
                               className="max-w-xs md:max-w-sm lg:max-w-md h-auto rounded-md object-cover cursor-pointer"
                               onError={(e) => {
-                                // Fallback to displaying the URL as text if image fails to load
-                                e.currentTarget.style.display = 'none'; // Hide broken image
+                                e.currentTarget.style.display = 'none';
                                 const parent = e.currentTarget.parentElement;
                                 if (parent) {
                                   const textNode = document.createElement('span');
@@ -464,7 +466,6 @@ const ChatroomPage: React.FC = () => {
                             />
                           </a>
                         ) : (
-                          // Otherwise, render as plain text
                           <p>{msg.text}</p>
                         )}
                       </div>
@@ -504,7 +505,6 @@ const ChatroomPage: React.FC = () => {
         &copy; {new Date().getFullYear()} Convofy.
       </footer>
 
-      {/* User Profile Modal */}
       {isProfileModalOpen && selectedUser && (
         <UserProfileModal
           user={selectedUser}
