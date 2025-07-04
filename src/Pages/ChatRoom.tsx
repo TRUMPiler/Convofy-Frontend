@@ -59,7 +59,8 @@ const ChatroomPage: React.FC = () => {
   const [newMessageText, setNewMessageText] = useState<string>('');
   const stompClient = useRef<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const messageSoundRef = useRef<HTMLAudioElement | null>(null);
+  // Directly initialize Audio object and set preload. No need for a separate useEffect for this.
+  const messageSound = useRef(new Audio('/message-sound.mp3'));
   const [audioUnlocked, setAudioUnlocked] = useState(false);
   const [isHistoryLoaded, setIsHistoryLoaded] = useState(false);
 
@@ -87,15 +88,12 @@ const ChatroomPage: React.FC = () => {
     return '';
   };
 
-  useEffect(() => {
-    messageSoundRef.current = new Audio('/message-sound.mp3');
-    messageSoundRef.current.preload = 'auto';
-  }, []);
-
   const playMessageSound = () => {
-    if (messageSoundRef.current && audioUnlocked) {
-      messageSoundRef.current.currentTime = 0;
-      messageSoundRef.current.play().catch(error => {
+    // Ensure the audio element is ready and unlocked
+    if (messageSound.current && audioUnlocked) {
+      messageSound.current.currentTime = 0; // Rewind to the start
+      messageSound.current.volume = 1; // Ensure volume is set to audible level for actual play
+      messageSound.current.play().catch(error => {
         console.error('Error playing sound:', error);
         if (error.name === 'NotSupportedError' || error.name === 'AbortError') {
           console.warn('Audio playback prevented by browser autoplay policy. User interaction might be required to enable sound.');
@@ -114,30 +112,34 @@ const ChatroomPage: React.FC = () => {
     console.log('onlineUsers state updated:', onlineUsers);
   }, [onlineUsers]);
 
+  // Effect to handle audio unlocking on first user interaction
   useEffect(() => {
     const unlockAudio = () => {
-      if (!audioUnlocked && messageSoundRef.current) {
-        messageSoundRef.current.volume = 0;
-        messageSoundRef.current.play().then(() => {
+      if (!audioUnlocked && messageSound.current) {
+        messageSound.current.volume = 0; // Set volume to 0 for silent unlock
+        messageSound.current.play().then(() => {
           setAudioUnlocked(true);
-          messageSoundRef.current!.volume = 1;
+          messageSound.current!.volume = 1; // Restore volume after successful unlock
           console.log("Audio unlocked successfully!");
         }).catch(error => {
           console.warn("Could not unlock audio automatically:", error);
         });
       }
+      // Remove the listener after the first attempt, regardless of success
       document.removeEventListener('click', unlockAudio);
       document.removeEventListener('keydown', unlockAudio);
     };
 
+    // Attach listeners for user interaction to attempt unlocking audio
     document.addEventListener('click', unlockAudio);
     document.addEventListener('keydown', unlockAudio);
 
     return () => {
+      // Clean up listeners if component unmounts before audio is unlocked
       document.removeEventListener('click', unlockAudio);
       document.removeEventListener('keydown', unlockAudio);
     };
-  }, [audioUnlocked]);
+  }, [audioUnlocked]); // Dependency on audioUnlocked to ensure it only runs once it's false
 
   useEffect(() => {
     const fetchChatHistory = async () => {
@@ -161,7 +163,7 @@ const ChatroomPage: React.FC = () => {
 
         if (response.data.success && response.data.data) {
           setMessages(response.data.data.reverse());
-          setIsHistoryLoaded(true);
+          setIsHistoryLoaded(true); // Set history as loaded
           console.log('Chat history fetched:', response.data.data);
         } else {
           toast.error(response.data.message || 'Failed to fetch chat history. Please ensure your backend is running and the /api/chat/history/{chatroomId} endpoint is correctly implemented.', { duration: 5000 });
@@ -177,6 +179,7 @@ const ChatroomPage: React.FC = () => {
     fetchChatHistory();
   }, [chatroomId, currentUserId]);
 
+  // Effect to handle WebSocket connection and subscriptions
   useEffect(() => {
     if (!chatroomId) {
       console.error('No chatroomId available for WebSocket connection.');
@@ -204,12 +207,15 @@ const ChatroomPage: React.FC = () => {
         const receivedUsers: OnlineUser[] = JSON.parse(message.body);
         setOnlineUsers(receivedUsers);
         console.log('Received online users update:', receivedUsers);
+        // Do NOT play sound here for user join/leave
       }, headers);
 
       stompClient.current.subscribe(`/topic/chatroom/${chatroomId}/messages`, (message: any) => {
         const receivedMessage: ChatMessageResponse = JSON.parse(message.body);
         console.log('Received new message:', receivedMessage);
         setMessages((prevMessages) => {
+          // Play sound ONLY if the message is from another user AND history has loaded
+          // This prevents sound for initial history load or own messages
           if (isHistoryLoaded && receivedMessage.userId !== currentUserId) {
             playMessageSound();
           }
@@ -246,6 +252,7 @@ const ChatroomPage: React.FC = () => {
     };
   }, [chatroomId, currentUserId, audioUnlocked, isHistoryLoaded]);
 
+  // Effect to handle beforeunload event for leaving chatroom
   useEffect(() => {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
       if (stompClient.current && stompClient.current.connected) {
@@ -276,6 +283,7 @@ const ChatroomPage: React.FC = () => {
     };
   }, [chatroomId]);
 
+  // Effect to fetch chatroom details
   useEffect(() => {
     const fetchChatroomDetails = async () => {
       if (!chatroomId) {
