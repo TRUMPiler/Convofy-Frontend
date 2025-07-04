@@ -8,9 +8,6 @@ import { Stomp } from '@stomp/stompjs';
 import Cookies from 'js-cookie';
 import UserProfileModal from '../Components/UserProfileModal';
 
-// Import the sound file directly. Vite/Webpack will process this and give you a URL.
-
-
 interface Interest {
   interestId: string;
   name: string;
@@ -35,6 +32,26 @@ interface ChatMessageResponse {
   time: string;
 }
 
+// Function to check if a URL is an image or GIF
+const isImageOrGifUrl = (url: string): boolean => {
+  if (!url || typeof url !== 'string') {
+    return false;
+  }
+  // Regex to check for common image/gif extensions
+  const imageRegex = /\.(jpeg|jpg|png|gif|webp|bmp|svg)$/i;
+  try {
+    const parsedUrl = new URL(url);
+    // Check path extension or common image/GIF hosting domains
+    return imageRegex.test(parsedUrl.pathname) ||
+           parsedUrl.hostname.includes('imgur.com') ||
+           parsedUrl.hostname.includes('giphy.com') ||
+           parsedUrl.hostname.includes('tenor.com');
+  } catch (e) {
+    // If URL parsing fails, it's not a valid URL
+    return false;
+  }
+};
+
 const ChatroomPage: React.FC = () => {
   const { chatroomId } = useParams<{ chatroomId: string }>();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -46,7 +63,8 @@ const ChatroomPage: React.FC = () => {
   const [newMessageText, setNewMessageText] = useState<string>('');
   const stompClient = useRef<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const audioRef = useRef<HTMLAudioElement>(null); // Ref for the audio element
+  const messageSoundRef = useRef<HTMLAudioElement | null>(null); // Ref for the Audio object
+  const [audioUnlocked, setAudioUnlocked] = useState(false); // State to track if audio is unlocked
 
   const [selectedUser, setSelectedUser] = useState<OnlineUser | ChatMessageResponse | null>(null);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -72,30 +90,64 @@ const ChatroomPage: React.FC = () => {
     return '';
   };
 
+  // Initialize Audio object once on component mount
+  useEffect(() => {
+    messageSoundRef.current = new Audio('/message-sound.mp3');
+    messageSoundRef.current.preload = 'auto'; // Ensure it's preloaded
+  }, []);
+
   // Function to play the message sound
   const playMessageSound = () => {
-    if (audioRef.current) {
-      audioRef.current.currentTime = 0; // Rewind to the start
-      audioRef.current.play().catch(error => {
+    if (messageSoundRef.current && audioUnlocked) { // Only attempt to play if audio is unlocked
+      messageSoundRef.current.currentTime = 0; // Rewind to the start
+      messageSoundRef.current.play().catch(error => {
         console.error('Error playing sound:', error);
-        // This catch block will specifically handle the NotSupportedError
-        // or other playback issues like user gesture requirements.
         if (error.name === 'NotSupportedError' || error.name === 'AbortError') {
-          console.warn('Audio playback prevented. User interaction might be required.');
-          // You might show a subtle message to the user here, e.g., "Click anywhere to enable sound"
+          console.warn('Audio playback prevented by browser autoplay policy. User interaction might be required to enable sound.');
         }
       });
+    } else if (!audioUnlocked) {
+      console.warn('Attempted to play sound before audio was unlocked by user interaction.');
     }
   };
 
+  // Effect to scroll to the bottom of messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Effect to log online users update
   useEffect(() => {
     console.log('onlineUsers state updated:', onlineUsers);
   }, [onlineUsers]);
 
+  // Effect to handle audio unlocking on first user interaction
+  useEffect(() => {
+    const unlockAudio = () => {
+      if (!audioUnlocked && messageSoundRef.current) {
+        messageSoundRef.current.volume = 0; // Temporarily set volume to 0
+        messageSoundRef.current.play().then(() => {
+          setAudioUnlocked(true);
+          messageSoundRef.current!.volume = 1; // Restore volume
+          console.log("Audio unlocked successfully!");
+        }).catch(error => {
+          console.warn("Could not unlock audio automatically:", error);
+        });
+      }
+      document.removeEventListener('click', unlockAudio);
+      document.removeEventListener('keydown', unlockAudio);
+    };
+
+    document.addEventListener('click', unlockAudio);
+    document.addEventListener('keydown', unlockAudio);
+
+    return () => {
+      document.removeEventListener('click', unlockAudio);
+      document.removeEventListener('keydown', unlockAudio);
+    };
+  }, [audioUnlocked]);
+
+  // Effect to fetch chat history
   useEffect(() => {
     const fetchChatHistory = async () => {
       if (!chatroomId) {
@@ -133,6 +185,7 @@ const ChatroomPage: React.FC = () => {
     fetchChatHistory();
   }, [chatroomId, currentUserId]);
 
+  // Effect to handle WebSocket connection and subscriptions
   useEffect(() => {
     if (!chatroomId) {
       console.error('No chatroomId available for WebSocket connection.');
@@ -166,7 +219,6 @@ const ChatroomPage: React.FC = () => {
         const receivedMessage: ChatMessageResponse = JSON.parse(message.body);
         console.log('Received new message:', receivedMessage);
         setMessages((prevMessages) => {
-          // Play sound only if the message is not from the current user
           if (receivedMessage.userId !== currentUserId) {
             playMessageSound();
           }
@@ -201,8 +253,9 @@ const ChatroomPage: React.FC = () => {
         });
       }
     };
-  }, [chatroomId, currentUserId]); // Added currentUserId to dependencies to ensure correct sound playing logic
+  }, [chatroomId, currentUserId, audioUnlocked]);
 
+  // Effect to handle beforeunload event for leaving chatroom
   useEffect(() => {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
       if (stompClient.current && stompClient.current.connected) {
@@ -233,6 +286,7 @@ const ChatroomPage: React.FC = () => {
     };
   }, [chatroomId]);
 
+  // Effect to fetch chatroom details
   useEffect(() => {
     const fetchChatroomDetails = async () => {
       if (!chatroomId) {
@@ -403,6 +457,8 @@ const ChatroomPage: React.FC = () => {
             ) : (
               messages.map((msg) => {
                 const isOwnMessage = msg.userId === currentUserId;
+                const isMediaMessage = isImageOrGifUrl(msg.text);
+
                 return (
                   <div
                     key={msg.id}
@@ -441,14 +497,33 @@ const ChatroomPage: React.FC = () => {
                           <span className="font-semibold text-blue-500">You</span>
                         )}
                       </div>
-                      <p
+                      <div
                         className={`
                             rounded-lg px-4 py-2 text-foreground break-words max-w-lg shadow-sm
                             ${isOwnMessage ? 'bg-blue-600 text-white' : 'bg-secondary'}
                           `}
                       >
-                        {msg.text}
-                      </p>
+                        {isMediaMessage ? (
+                          <a href={msg.text} target="_blank" rel="noopener noreferrer">
+                            <img
+                              src={msg.text}
+                              alt="Shared content"
+                              className="max-w-xs md:max-w-sm lg:max-w-md h-auto rounded-md object-cover cursor-pointer"
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                                const parent = e.currentTarget.parentElement;
+                                if (parent) {
+                                  const textNode = document.createElement('span');
+                                  textNode.textContent = msg.text;
+                                  parent.appendChild(textNode);
+                                }
+                              }}
+                            />
+                          </a>
+                        ) : (
+                          <p>{msg.text}</p>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );
@@ -484,8 +559,6 @@ const ChatroomPage: React.FC = () => {
       <footer className="p-4 text-center text-muted-foreground text-sm border-t border-border">
         &copy; {new Date().getFullYear()} Convofy.
       </footer>
-
-      <audio ref={audioRef} src="/message-sound.mp3" preload="auto" />
 
       {isProfileModalOpen && selectedUser && (
         <UserProfileModal
