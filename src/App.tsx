@@ -19,11 +19,11 @@ function App() {
     <Router>
       <Routes>
       <Route path="/" element={<InterestsPage />} />
-      <Route path="/Test" element={<Test />} />
+      <Route path="/Test/:interestId" element={<Test />} />
       <Route path="/Login" element={<LoginPage />} />
       <Route path="/Register" element={<RegisterPage />} />
       <Route path="/WS" element={<WsChecker />} />
-      <Route path="/Waiting" element={<WaitingRoom />} />
+ <Route path="/waiting/:interestId" element={<WaitingRoom />} />
       <Route path="/create" element={<CreateMeeting />}/>
       <Route path="/join/:meetid" element={<JoinMeeting />} />
       <Route path="/Interests" element={<InterestsPage />} />
