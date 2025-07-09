@@ -13,29 +13,30 @@ interface WaitingQueueInterestDTO {
     statusid?: string;
 }
 
-// Updated MatchNotificationPayload based on WebSocketController.notifyUser
 interface MatchNotificationPayload {
     meetId: string;
     message: string;
-    userId: string; // The recipient's userId (current user's userId)
-    useremail: string; // This is actually the partner's userId string as sent by backend
+    userId: string;
+    partnerId: string;
+    partnerName: string;
+    partnerAvatar: string;
+    sessionId:string;
 }
 
 const WaitingRoom: React.FC = () => {
     const navigate = useNavigate();
     const { interestId } = useParams<{ interestId: string }>();
     const [status, setStatus] = useState<"waiting" | "ready" | "error" | "Nothing">("Nothing");
-    // otherUserEmail will now store the 'useremail' from the WS payload, which is the partner's userId string
     const [otherUserEmail, setOtherUserEmail] = useState<string | null>(null);
     const [meetId, setMeetId] = useState<string | null>(null);
-    // videoSdkToken is not sent by backend's notifyUser, will remain null/empty until backend sends it
-    const [videoSdkToken, setVideoSdkToken] = useState<string | null>(null);
-    // partnerAvatar and partnerName are derived from the partner's userId string received via WS
+    const [sessionId, setSessionId] = useState<string | null>(null);
+    const [interestName, setInterestName] = useState<string>("Loading interest...");
     const [partnerAvatar, setPartnerAvatar] = useState<string | null>(null);
     const [partnerName, setPartnerName] = useState<string | null>(null);
 
     const initialCheckTriggered = useRef(false);
     const stompClientRef = useRef<Client | null>(null);
+    const matchFoundByWSRef = useRef(false);
 
     useEffect(() => {
         if (!Cookies.get("userId")) {
@@ -46,6 +47,30 @@ const WaitingRoom: React.FC = () => {
             navigate("/dashboard");
         }
     }, [navigate, interestId]);
+
+    useEffect(() => {
+        const fetchInterestName = async () => {
+            if (!interestId) {
+                setInterestName("Unknown Interest");
+                return;
+            }
+            try {
+                const response = await axios.get(`http://localhost:8080/api/interests/${interestId}`);
+                if (response.data.success && response.data.data && response.data.data.name) {
+                    setInterestName(response.data.data.name);
+                } else {
+                    setInterestName("Interest Not Found");
+                    toast.error(response.data.message || "Failed to fetch interest details.");
+                }
+            } catch (error) {
+                console.error("Error fetching interest name:", error);
+                setInterestName("Error loading interest");
+                toast.error("Error loading interest name.");
+            }
+        };
+
+        fetchInterestName();
+    }, [interestId]);
 
     useEffect(() => {
         const userId = Cookies.get("userId");
@@ -60,32 +85,34 @@ const WaitingRoom: React.FC = () => {
         }
 
         const client = new Client({
-            webSocketFactory: () => new SockJS("https://api.convofy.fun/ws"),
+            webSocketFactory: () => new SockJS("http://localhost:8080/ws"),
             debug: (str) => console.log(str),
             onConnect: () => {
                 console.log("Connected to WebSocket server");
-                // Subscribing to /queue/matches as per WebSocketController.java
                 client.subscribe(`/queue/matches`, (message) => {
                     try {
                         const data: MatchNotificationPayload = JSON.parse(message.body);
                         console.log("Received WebSocket message:", data);
-
-                        // Check if the notification is for the current user
+                        
                         if (data.userId === userId) {
-                            if (data.meetId) {
+                            if (data.meetId && data.sessionId && data.partnerId) {
                                 console.log("WebSocket: Match found! Setting status to ready and meetId:", data.meetId);
+                                matchFoundByWSRef.current = true;
                                 setMeetId(data.meetId);
-                                setOtherUserEmail(data.useremail); // This is the partner's userId string from backend
-                                // As per instruction, videoSdkToken, partnerName, partnerAvatar are not sent by backend WS
-                                // We will derive partnerName and partnerAvatar from data.useremail (partner's userId string)
-                                setVideoSdkToken(""); // VideoSDK token is not in this WS payload
-                                setPartnerName(`User ${data.useremail.substring(0, 4)}`); // Generate simple name
-                                setPartnerAvatar(`https://api.dicebear.com/7.x/pixel-art/svg?seed=${data.useremail}`); // Generate avatar
-                                navigate(`/join/${data.meetId}`);
+                                setOtherUserEmail(data.partnerId);
+                                setPartnerName(data.partnerName); 
+                                setPartnerAvatar(data.partnerAvatar); 
+                                setSessionId(data.sessionId);
+                                Cookies.set("sessionId", data.sessionId);
                                 setStatus("ready");
                                 toast.success(`Match found! Preparing your call...`);
+
+                                navigate(
+                                    `/join/${data.meetId}?partnerName=${encodeURIComponent(data.partnerName || '')}&partnerAvatar=${encodeURIComponent(data.partnerAvatar || '')}&interestId=${encodeURIComponent(interestId || '')}&sessionId=${encodeURIComponent(data.sessionId || '')}&partnerId=${encodeURIComponent(data.partnerId || '')}`
+                                );
+
                             } else {
-                                console.log("WebSocket: Received message without meetId, ignoring:", data);
+                                console.log("WebSocket: Received message without meetId, sessionId, or partnerId, ignoring:", data);
                             }
                         } else {
                             console.log("WebSocket: Received message for another user, ignoring.");
@@ -120,10 +147,17 @@ const WaitingRoom: React.FC = () => {
     }, [navigate, interestId]);
 
     const checkQueueStatus = useCallback(async () => {
+        if (matchFoundByWSRef.current) {
+            console.log("HTTP Check skipped: Match already found by WebSocket.");
+            return;
+        }
+
         if (status === "ready") {
             return;
         }
-        setStatus("Nothing");
+        if (status !== "waiting") {
+            setStatus("Nothing");
+        }
 
         const userId = Cookies.get("userId");
         const jwtToken = Cookies.get("jwtToken");
@@ -142,7 +176,7 @@ const WaitingRoom: React.FC = () => {
             };
 
             const response = await axios.post(
-                "https://api.convofy.fun/api/queue/check",
+                "http://localhost:8080/api/queue/check",
                 requestBody,
                 { headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwtToken}` } }
             );
@@ -152,23 +186,19 @@ const WaitingRoom: React.FC = () => {
                     const matchedPartnerId = response.data.data;
                     console.log("HTTP Check: Immediate match found with partner ID:", matchedPartnerId);
 
-                    // Trigger meeting creation on backend.
-                    // The creator will now WAIT for WebSocket notification for meetId and other details.
                     await axios.post(
-                        "https://api.convofy.fun/api/meetings/create",
+                        "http://localhost:8080/api/meetings/create",
                         { userid1: userId, userid2: matchedPartnerId, interestId: interestId },
                         { headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwtToken}` } }
                     );
 
-                    // After triggering creation, immediately set status to waiting
-                    // and rely on WebSocket to change to "ready" when meetId is received.
                     setStatus("waiting");
                     toast.info("Match found! Waiting for meeting details...", { duration: 5000 });
 
                 } else {
                     console.log("HTTP Check: User already in queue, waiting for a partner.");
                     setStatus("waiting");
-                    toast.info("You are already in the queue, waiting for a match...", { duration: 5000 });
+                    toast.info("You are already in the queue. Waiting for a match...", { duration: 5000 });
                 }
             } else if (response.status === 201) {
                 console.log("HTTP Check: User added to queue, waiting for a partner.");
@@ -196,20 +226,6 @@ const WaitingRoom: React.FC = () => {
         }
     }, [checkQueueStatus, interestId]);
 
-    useEffect(() => {
-        // Navigation now depends on all necessary pieces being set by the WebSocket
-        if (status === "ready" && meetId && videoSdkToken !== null && partnerName !== null && partnerAvatar !== null && interestId) {
-            console.log("Navigation useEffect: Status is ready and meetId exists, navigating to:", `/call/${meetId}`);
-            const timer = setTimeout(() => {
-                navigate(`/call/${meetId}?token=${encodeURIComponent(videoSdkToken || '')}&partnerName=${encodeURIComponent(partnerName || '')}&partnerAvatar=${encodeURIComponent(partnerAvatar || '')}&interestId=${encodeURIComponent(interestId || '')}`);
-            }, 500);
-
-            return () => clearTimeout(timer);
-        } else {
-            console.log("Navigation useEffect: Current Status:", status, "Current MeetId:", meetId, "Token:", videoSdkToken, "PartnerName:", partnerName, "PartnerAvatar:", partnerAvatar);
-        }
-    }, [status, meetId, videoSdkToken, partnerName, partnerAvatar, interestId, navigate]);
-
     const handleLeaveQueue = async () => {
         const userId = Cookies.get("userId");
         const jwtToken = Cookies.get("jwtToken");
@@ -222,7 +238,7 @@ const WaitingRoom: React.FC = () => {
         try {
             toast.info("Leaving the queue...");
             const response = await axios.get(
-                `https://api.convofy.fun/api/queue/leave/${userId}`,
+                `http://localhost:8080/api/queue/leave/${userId}`,
                 { headers: { Authorization: `Bearer ${jwtToken}` } }
             );
 
@@ -242,6 +258,9 @@ const WaitingRoom: React.FC = () => {
         <>
             <Navbar />
             <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground">
+                <h1 className="text-4xl font-bold mb-4 text-primary">
+                    Connecting with someone having same interest [ {interestName} ]
+                </h1>
                 {status === "ready" && (
                     <div className="text-center p-6 bg-card rounded-xl shadow-lg border border-border max-w-md w-full mx-4">
                         <p className="text-2xl font-bold mb-4 text-primary">Meeting Ready!</p>
@@ -249,9 +268,8 @@ const WaitingRoom: React.FC = () => {
                         <p className="text-sm text-muted-foreground mb-6">Meeting ID: <span className="font-mono bg-secondary px-2 py-1 rounded-md">{meetId}</span></p>
                         <button
                             className="bg-green-600 text-white py-3 px-8 rounded-lg font-bold text-lg
-                                       hover:bg-green-700 transition-colors duration-300 shadow-md transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-75"
-                            onClick={() => navigate(`/call/${meetId}?token=${encodeURIComponent(videoSdkToken || '')}&partnerName=${encodeURIComponent(partnerName || '')}&partnerAvatar=${encodeURIComponent(partnerAvatar || '')}&interestId=${encodeURIComponent(interestId || '')}`)}
-                        >
+                                         hover:bg-green-700 transition-colors duration-300 shadow-md transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-75"
+                             onClick={() => navigate(`/join/${meetId}?partnerName=${encodeURIComponent(partnerName || '')}&partnerAvatar=${encodeURIComponent(partnerAvatar || '')}&interestId=${encodeURIComponent(interestId || '')}&sessionId=${encodeURIComponent(sessionId || '')}&partnerId=${encodeURIComponent(otherUserEmail || '')}`)}>
                             Join Meeting
                         </button>
                     </div>
@@ -259,7 +277,7 @@ const WaitingRoom: React.FC = () => {
                 {status === "waiting" && (
                     <div className="text-center p-6">
                         <p className="text-3xl text-primary font-extrabold animate-pulse">Waiting for another participant...</p>
-                        <p className="text-muted-foreground mt-4 text-lg">You are in the queue for **{interestId}**. Please keep this page open. We'll connect you soon!</p>
+                        
                         <div className="mt-8 flex justify-center">
                             <svg className="animate-spin h-10 w-10 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -269,7 +287,7 @@ const WaitingRoom: React.FC = () => {
                         <button
                             onClick={handleLeaveQueue}
                             className="mt-8 bg-red-600 text-white py-3 px-8 rounded-lg font-bold text-lg
-                                       hover:bg-red-700 transition-colors duration-300 shadow-md transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-75"
+                                         hover:bg-red-700 transition-colors duration-300 shadow-md transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-75"
                         >
                             Leave Queue
                         </button>
@@ -281,7 +299,7 @@ const WaitingRoom: React.FC = () => {
                         <p className="text-lg mb-6">An error occurred. Please try again.</p>
                         <button
                             className="bg-red-600 text-white py-3 px-8 rounded-lg font-bold text-lg
-                                       hover:bg-red-700 transition-colors duration-300 shadow-md transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-75"
+                                         hover:bg-red-700 transition-colors duration-300 shadow-md transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-75"
                             onClick={checkQueueStatus}
                         >
                             Retry

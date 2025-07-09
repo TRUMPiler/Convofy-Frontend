@@ -1,5 +1,5 @@
-import React from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import React, { useEffect, useState } from "react"; // Added useState
+import { useParams, useNavigate, useSearchParams } from "react-router-dom"; // Added useSearchParams
 import { MeetingProvider } from "@videosdk.live/react-sdk";
 import MeetingView from "./MeetingView";
 import { authToken, createMeeting } from "./Sub-parts/MeetComponents";
@@ -36,10 +36,20 @@ const CreateMeeting: React.FC = () => {
 
 const JoinMeeting: React.FC = () => {
   const { meetid } = useParams<{ meetid: string }>();
+  console.log("JoinMeeting: meetid:", meetid);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams(); // Hook to get query parameters
 
-  if (!meetid) {
-    navigate("/"); // Redirect to home or another page if `meetingId` is undefined
+  const sessionId = searchParams.get("sessionId");
+  const partnerName = searchParams.get("partnerName");
+  const partnerAvatar = searchParams.get("partnerAvatar");
+  const interestId = searchParams.get("interestId");
+  const partnerId = searchParams.get("partnerId"); // Assuming partnerId is also passed if needed for StartCall
+
+  if (!meetid || !sessionId || !interestId || !partnerName || !partnerAvatar || !partnerId) {
+    // Redirect if essential parameters are missing
+    console.error("Missing essential URL parameters for JoinMeeting:", { meetid, sessionId, interestId, partnerName, partnerAvatar, partnerId });
+    navigate("/");
     return null;
   }
 
@@ -56,7 +66,12 @@ const JoinMeeting: React.FC = () => {
     >
       <MeetingView
         meetingId={meetid}
-        onMeetingLeave={() => (window.location.href = "/")}
+        sessionId={sessionId} // Pass sessionId
+        interestId={interestId} // Pass interestId
+        partnerName={partnerName} // Pass partnerName
+        partnerAvatar={partnerAvatar} // Pass partnerAvatar
+        partnerId={partnerId} // Pass partnerId
+        onMeetingLeave={() => (window.location.href = "/test/"+interestId)} // Keep existing leave behavior
       />
     </MeetingProvider>
   );

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom"; // Import useNavigate if not already
 import { toast } from 'sonner'; // Assuming you have sonner for toasts
-
+import Cookies from "js-cookie";
+import axios from "axios";
 // Add a prop type for interestId
 const PermissionsSetup: React.FC<{ interestId?: string }> = ({ interestId }) => {
     const navigate = useNavigate(); // Initialize useNavigate
@@ -18,7 +19,35 @@ const PermissionsSetup: React.FC<{ interestId?: string }> = ({ interestId }) => 
             toast.error("Interest ID is missing. Cannot enter the queue.");
         }
     };
+ const handleLeaveQueue = async () => {
+        const userId = Cookies.get("userId");
+        const jwtToken = Cookies.get("jwtToken");
 
+        if (!userId || !jwtToken) {
+            toast.error("User ID or JWT token missing. Cannot leave queue.");
+            return;
+        }
+
+        try {
+            toast.info("Leaving the queue...");
+            const response = await axios.get(
+                `http://localhost:8080/api/queue/leave/${userId}`,
+                { headers: { Authorization: `Bearer ${jwtToken}` } }
+            );
+
+            if (response.data.success) {
+                toast.success('Successfully left the queue.');
+                navigate(`/chatroom/${interestId}`);
+            } else {
+                navigate(`/chatroom/${interestId}`);
+                toast.error('Failed to leave queue.');
+            }
+        } catch (error: any) {
+            navigate(`/chatroom/${interestId}`);
+            console.error('Error leaving queue:', error);
+            toast.error('An error occurred while leaving the queue.');
+        }
+    };
     const checkPermissions = async () => {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
@@ -65,6 +94,13 @@ const PermissionsSetup: React.FC<{ interestId?: string }> = ({ interestId }) => 
                         muted
                         style={{ width: "300px", height: "200px", border: "1px solid white" }}
                     />
+                     <button
+                            onClick={handleLeaveQueue}
+                            className="mt-8 bg-red-600 text-white py-3 px-8 rounded-lg font-bold text-lg
+                                         hover:bg-red-700 transition-colors duration-300 shadow-md transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-75"
+                        >
+                            Leave Queue
+                        </button>
                     <button
                         onClick={checkServerForQueue}
                         className="mt-4 px-4 py-2 bg-blue-600 text-white rounded shadow"

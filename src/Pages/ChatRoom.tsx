@@ -50,7 +50,7 @@ const isImageOrGifUrl = (url: string): boolean => {
 
 const ChatroomPage: React.FC = () => {
     const { chatroomId } = useParams<{ chatroomId: string }>();
-    const navigate = useNavigate(); // Initialize useNavigate
+    const navigate = useNavigate();
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [chatroomName, setChatroomName] = useState<string>('Loading Chatroom...');
     const [loadingChatroom, setLoadingChatroom] = useState(true);
@@ -150,7 +150,7 @@ const ChatroomPage: React.FC = () => {
                     return;
                 }
 
-                const response = await axios.get(`https://api.convofy.fun/api/chat/history/${chatroomId}?page=0&size=50`, {
+                const response = await axios.get(`http://localhost:8080/api/chat/history/${chatroomId}?page=0&size=50`, {
                     headers: {
                         Authorization: `Bearer ${jwtToken}`,
                     },
@@ -187,7 +187,7 @@ const ChatroomPage: React.FC = () => {
             return;
         }
 
-        const socket = new SockJS('https://api.convofy.fun/ws');
+        const socket = new SockJS('http://localhost:8080/ws');
         stompClient.current = Stomp.over(socket);
 
         const headers = {
@@ -284,7 +284,7 @@ const ChatroomPage: React.FC = () => {
             try {
                 setLoadingChatroom(true);
                 setErrorChatroom(null);
-                const response = await axios.get(`https://api.convofy.fun/api/interests/${chatroomId}`);
+                const response = await axios.get(`http://localhost:8080/api/interests/${chatroomId}`);
 
                 if (response.data.success && response.data.data) {
                     setChatroomName(response.data.data.name);
@@ -307,7 +307,6 @@ const ChatroomPage: React.FC = () => {
     }, [chatroomId]);
 
     const handleConnectRandom = () => {
-        // Navigates to /waiting/{interestId} (which is chatroomId)
         if (chatroomId) {
             navigate(`/test/${chatroomId}`);
             toast.info("Connecting with a random user...");
@@ -394,7 +393,7 @@ const ChatroomPage: React.FC = () => {
 
                     <div className="mb-6 flex-shrink-0">
                         <button
-                            onClick={handleConnectRandom} // This now navigates to /waiting/{chatroomId}
+                            onClick={handleConnectRandom}
                             className="bg-accent text-accent-foreground px-4 py-2 rounded-md font-semibold text-sm w-full
                                        hover:bg-accent/90 transition-colors duration-300 shadow-sm
                                        focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-50"
@@ -434,9 +433,16 @@ const ChatroomPage: React.FC = () => {
                 )}
 
                 <section className="flex-grow flex flex-col bg-background p-4 min-h-0 overflow-hidden">
-                    <h1 className="text-3xl font-bold mb-6 text-center text-primary">
+                    <h1 className="text-3xl font-bold mb-2 text-center text-primary">
                         {loadingChatroom ? 'Loading Chatroom...' : errorChatroom ? 'Error' : `${chatroomName} Chatroom`}
                     </h1>
+                    {/* Display the interest name prominently */}
+                    {!loadingChatroom && !errorChatroom && chatroomName && (
+                        <div className="text-center text-lg text-muted-foreground font-medium mb-4">
+                            Interest: <span className="text-accent-foreground">{chatroomName}</span>
+                        </div>
+                    )}
+
                     {errorChatroom && (
                         <div className="text-error text-center mb-4 p-2 bg-red-900 bg-opacity-30 border border-error rounded-md">
                             {errorChatroom}

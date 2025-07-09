@@ -19,7 +19,7 @@ const GoogleRegisterButton: React.FC = () => {
             console.log('Picture:', decoded.picture);
 
             const response = await axios.post(
-                'https://api.convofy.fun/api/users', // This is the registration endpoint
+                'http://localhost:8080/api/users', // This is the registration endpoint
                 {
                     name: decoded.name,
                     email: decoded.email,
