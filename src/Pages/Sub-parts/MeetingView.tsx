@@ -50,7 +50,7 @@ const MeetingView: React.FC<MeetingViewProps> = ({ meetingId, onMeetingLeave, pa
             const jwtToken = getJwtToken();
             console.log("Attempting to end meeting. currentUserId from cookie:", currentUserId); // Debug log
             await axios.post(
-                'http://localhost:8080/api/meetings/end',
+                'https://api.convofy.fun/api/meetings/end',
                 { meetId: meetingId, disconnectedUserId: currentUserId },
                 {
                     headers: {
@@ -94,7 +94,7 @@ const MeetingView: React.FC<MeetingViewProps> = ({ meetingId, onMeetingLeave, pa
         }
 
         const client = new Client({
-            webSocketFactory: () => new SockJS("http://localhost:8080/ws"),
+            webSocketFactory: () => new SockJS("https://api.convofy.fun/ws"),
             debug: (str) => console.log(str),
             onConnect: () => {
                 console.log("Connected to WebSocket server for MeetingView events!");

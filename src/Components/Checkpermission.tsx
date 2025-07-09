@@ -31,7 +31,7 @@ const PermissionsSetup: React.FC<{ interestId?: string }> = ({ interestId }) => 
         try {
             toast.info("Leaving the queue...");
             const response = await axios.get(
-                `http://localhost:8080/api/queue/leave/${userId}`,
+                `https://api.convofy.fun/api/queue/leave/${userId}`,
                 { headers: { Authorization: `Bearer ${jwtToken}` } }
             );
 

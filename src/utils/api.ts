@@ -13,7 +13,7 @@ interface InterestDetails {
 
 export const fetchInterestNameById = async (interestId: string): Promise<string | null> => {
   try {
-    const response = await axios.get(`http://localhost:8080/api/interests/${interestId}`);
+    const response = await axios.get(`https://api.convofy.fun/api/interests/${interestId}`);
     if (response.data.success && response.data.data) {
       return response.data.data.name; // Return the interest name
     } else {

@@ -55,7 +55,7 @@ const WaitingRoom: React.FC = () => {
                 return;
             }
             try {
-                const response = await axios.get(`http://localhost:8080/api/interests/${interestId}`);
+                const response = await axios.get(`https://api.convofy.fun/api/interests/${interestId}`);
                 if (response.data.success && response.data.data && response.data.data.name) {
                     setInterestName(response.data.data.name);
                 } else {
@@ -85,7 +85,7 @@ const WaitingRoom: React.FC = () => {
         }
 
         const client = new Client({
-            webSocketFactory: () => new SockJS("http://localhost:8080/ws"),
+            webSocketFactory: () => new SockJS("https://api.convofy.fun/ws"),
             debug: (str) => console.log(str),
             onConnect: () => {
                 console.log("Connected to WebSocket server");
@@ -176,7 +176,7 @@ const WaitingRoom: React.FC = () => {
             };
 
             const response = await axios.post(
-                "http://localhost:8080/api/queue/check",
+                "https://api.convofy.fun/api/queue/check",
                 requestBody,
                 { headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwtToken}` } }
             );
@@ -187,7 +187,7 @@ const WaitingRoom: React.FC = () => {
                     console.log("HTTP Check: Immediate match found with partner ID:", matchedPartnerId);
 
                     await axios.post(
-                        "http://localhost:8080/api/meetings/create",
+                        "https://api.convofy.fun/api/meetings/create",
                         { userid1: userId, userid2: matchedPartnerId, interestId: interestId },
                         { headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwtToken}` } }
                     );
@@ -238,7 +238,7 @@ const WaitingRoom: React.FC = () => {
         try {
             toast.info("Leaving the queue...");
             const response = await axios.get(
-                `http://localhost:8080/api/queue/leave/${userId}`,
+                `https://api.convofy.fun/api/queue/leave/${userId}`,
                 { headers: { Authorization: `Bearer ${jwtToken}` } }
             );
 

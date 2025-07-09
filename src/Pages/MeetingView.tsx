@@ -55,7 +55,7 @@ const MeetingView: React.FC<MeetingViewProps> = ({ meetingId, sessionId, interes
 
         try {
             const response = await axios.post(
-                "http://localhost:8080/api/call/StartCall",
+                "https://api.convofy.fun/api/call/StartCall",
                 {
                     sessionid: sessionId,
                     userid1: currentUserId,
@@ -96,7 +96,7 @@ const MeetingView: React.FC<MeetingViewProps> = ({ meetingId, sessionId, interes
         try {
             toast.info("Ending call...");
             const response = await axios.post(
-                "http://localhost:8080/api/call/endCall",
+                "https://api.convofy.fun/api/call/endCall",
                 {
                     sessionId: sessionId,
                     userId: currentUserId,
@@ -142,7 +142,7 @@ const MeetingView: React.FC<MeetingViewProps> = ({ meetingId, sessionId, interes
         }
 
         const client = new Client({
-            webSocketFactory: () => new SockJS("http://localhost:8080/ws"),
+            webSocketFactory: () => new SockJS("https://api.convofy.fun/ws"),
             debug: (str) => console.log(`STOMP DEBUG: ${str}`),
             onConnect: () => {
                 console.log("Connected to WebSocket server for call-end notifications.");
