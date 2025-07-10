@@ -698,15 +698,15 @@ const ChatroomPage: React.FC = () => {
                             {editingMessageId && (
                                 <button
                                     onClick={handleCancelEdit}
-                                    className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-md transition-colors duration-200"
+                                   className="px-3 py-2 bg-red-500 hover:bg-red-600 text-white rounded-md transition-colors duration-200 text-sm md:px-4 md:py-2"
                                 >
                                     Cancel
                                 </button>
                             )}
                             <button
                                 type="submit"
-                                className="bg-primary text-primary-foreground px-5 py-3 rounded-lg font-semibold
-                                hover:bg-primary/90 transition-colors duration-300 disabled:opacity-50"
+                               className="bg-primary text-primary-foreground px-4 py-2 rounded-lg font-semibold
++                                hover:bg-primary/90 transition-colors duration-300 disabled:opacity-50 text-sm md:px-5 md:py-3"
                                 disabled={!stompClient.current?.connected || loadingChatroom || newMessageText.trim() === ''}
                             >
                                 {editingMessageId ? 'Update' : 'Send'}
