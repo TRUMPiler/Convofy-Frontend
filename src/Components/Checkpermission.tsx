@@ -29,19 +29,10 @@ const PermissionsSetup: React.FC<{ interestId?: string }> = ({ interestId }) => 
         }
 
         try {
-            toast.info("Leaving the queue...");
-            const response = await axios.get(
-                `https://api.convofy.fun/api/queue/leave/${userId}`,
-                { headers: { Authorization: `Bearer ${jwtToken}` } }
-            );
-
-            if (response.data.success) {
+           
                 toast.success('Successfully left the queue.');
                 navigate(`/chatroom/${interestId}`);
-            } else {
-                navigate(`/chatroom/${interestId}`);
-                toast.error('Failed to leave queue.');
-            }
+            
         } catch (error: any) {
             navigate(`/chatroom/${interestId}`);
             console.error('Error leaving queue:', error);
