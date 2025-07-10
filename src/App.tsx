@@ -11,11 +11,16 @@ import WsChecker from './Pages/WsChecker';
 // import JoinMeetingPage from './Pages/JoinMeetingPage';
 import InterestsPage from './Pages/InterestPage';
 import ChatroomPage from './Pages/ChatRoom';
+import Preloader from './Components/Preloader';
+import NotFound from './Components/PageNotFound';
+import AboutUsPage from './Pages/AboutUsPage';
+import PreloaderTestPage from './Pages/PreloaderTestPage';
 
 function App() {
   return (
     <>
     <Toaster />
+    <Preloader>
     <Router>
       <Routes>
       <Route path="/" element={<InterestsPage />} />
@@ -28,8 +33,12 @@ function App() {
       <Route path="/join/:meetid" element={<JoinMeeting />} />
       <Route path="/Interests" element={<InterestsPage />} />
        <Route path="/ChatRoom/:chatroomId" element={<ChatroomPage/>} />
+       <Route path='/about' element={<AboutUsPage />}/>
+       <Route path='/testingpreloader' element={<PreloaderTestPage />} />
+       <Route path="*" element={<NotFound />} />
       </Routes>
       </Router>
+      </Preloader>
     </>
   )
 }

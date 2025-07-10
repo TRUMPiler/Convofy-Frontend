@@ -8,7 +8,6 @@ import Cookies from "js-cookie";
 const Testing: React.FC = () => {
   return (
     <>
-      <CreateMeeting />
       <JoinMeeting />
     </>
   );

@@ -67,6 +67,14 @@ const ChatroomPage: React.FC = () => {
     const [selectedUser, setSelectedUser] = useState<OnlineUser | ChatMessageResponse | null>(null);
     const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
+    const [contextMenuVisible, setContextMenuVisible] = useState(false);
+    const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
+    const [selectedMessageForContext, setSelectedMessageForContext] = useState<ChatMessageResponse | null>(null);
+    const contextMenuRef = useRef<HTMLDivElement>(null);
+
+    const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+    const messageInputRef = useRef<HTMLInputElement>(null);
+
     const currentUserId = Cookies.get('userId');
     if (!currentUserId) {
         window.location.href = "/login";
@@ -106,6 +114,13 @@ const ChatroomPage: React.FC = () => {
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
+
+    useEffect(() => {
+        if (editingMessageId && messageInputRef.current) {
+            messageInputRef.current.focus();
+        }
+    }, [editingMessageId]);
+
 
     useEffect(() => {
         console.log('onlineUsers state updated:', onlineUsers);
@@ -159,14 +174,12 @@ const ChatroomPage: React.FC = () => {
                 if (response.data.success && response.data.data) {
                     setMessages(response.data.data.reverse());
                     setIsHistoryLoaded(true);
-                    console.log('Chat history fetched:', response.data.data);
                 } else {
-                    toast.error(response.data.message || 'Failed to fetch chat history. Please ensure your backend is running and the /api/chat/history/{chatroomId} endpoint is correctly implemented.', { duration: 5000 });
+                    toast.error('Failed to fetch chat history. Please ensure your backend is running and the /api/chat/history/{chatroomId} endpoint is correctly implemented.', { duration: 5000 });
                     setMessages([]);
                 }
             } catch (err) {
                 console.error('Error fetching chat history:', err);
-                toast.error('An error occurred while fetching chat history. Please ensure your backend is running and the /api/chat/history/{chatroomId} endpoint is correctly implemented.', { duration: 5000 });
                 setMessages([]);
             }
         };
@@ -207,10 +220,21 @@ const ChatroomPage: React.FC = () => {
                 const receivedMessage: ChatMessageResponse = JSON.parse(message.body);
                 console.log('Received new message:', receivedMessage);
                 setMessages((prevMessages) => {
-                    if (isHistoryLoaded && receivedMessage.userId !== currentUserId) {
-                        playMessageSound();
+                    const existingMessageIndex = prevMessages.findIndex(msg => msg.id === receivedMessage.id);
+
+                    if (existingMessageIndex > -1) {
+                        const updatedMessages = [...prevMessages];
+                        if (receivedMessage.text === "[Message Deleted]") {
+                            return updatedMessages.filter(msg => msg.id !== receivedMessage.id);
+                        }
+                        updatedMessages[existingMessageIndex] = receivedMessage;
+                        return updatedMessages;
+                    } else {
+                        if (isHistoryLoaded && receivedMessage.userId !== currentUserId) {
+                            playMessageSound();
+                        }
+                        return [...prevMessages, receivedMessage];
                     }
-                    return [...prevMessages, receivedMessage];
                 });
             }, headers);
 
@@ -290,7 +314,7 @@ const ChatroomPage: React.FC = () => {
                     setChatroomName(response.data.data.name);
                 } else {
                     setErrorChatroom(response.data.message || `Chatroom with ID ${chatroomId} not found.`);
-                    toast.error(response.data.message || `Chatroom with ID ${chatroomId} not found.`, { duration: 5000 });
+                    toast.error(`Chatroom with ID ${chatroomId} not found.`, { duration: 5000 });
                     setChatroomName('Error loading name');
                 }
             } catch (err: any) {
@@ -305,6 +329,25 @@ const ChatroomPage: React.FC = () => {
 
         fetchChatroomDetails();
     }, [chatroomId]);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (contextMenuRef.current && !contextMenuRef.current.contains(event.target as Node)) {
+                setContextMenuVisible(false);
+                setSelectedMessageForContext(null);
+            }
+        };
+
+        if (contextMenuVisible) {
+            document.addEventListener('mousedown', handleClickOutside);
+        } else {
+            document.removeEventListener('mousedown', handleClickOutside);
+        }
+
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [contextMenuVisible]);
 
     const handleConnectRandom = () => {
         if (chatroomId) {
@@ -330,25 +373,35 @@ const ChatroomPage: React.FC = () => {
     };
 
     const handleSendMessage = () => {
-        if (newMessageText.trim() === '') {
-            toast.info('Message cannot be empty!');
-            return;
-        }
-
-        if (!stompClient.current || !stompClient.current.connected) {
-            toast.error('Not connected to chat server. Please wait or refresh.');
+        if (!newMessageText.trim() || !chatroomId || !stompClient.current || !stompClient.current.connected) {
             return;
         }
 
         const jwtToken = getJwtToken();
+        if (!jwtToken) {
+            toast.error('Authentication required to send messages.');
+            return;
+        }
+
         const headers = { Authorization: `Bearer ${jwtToken}` };
 
-        stompClient.current.send(
-            `/app/chat.sendMessage`,
-            headers,
-            JSON.stringify({ chatroomId: chatroomId, content: newMessageText })
-        );
-        console.log(`Sent message: "${newMessageText}" to chatroom: ${chatroomId}`);
+        if (editingMessageId) {
+            const editMessagePayload = {
+                chatroomId: chatroomId,
+                messageId: editingMessageId,
+                content: newMessageText.trim(),
+            };
+            stompClient.current.send(`/app/chat.editMessage`, headers, JSON.stringify(editMessagePayload));
+            toast.success("Message updated!");
+            setEditingMessageId(null);
+        } else {
+            const messagePayload = {
+                chatroomId: chatroomId,
+                content: newMessageText.trim(),
+            };
+            stompClient.current.send(`/app/chat.sendMessage`, headers, JSON.stringify(messagePayload));
+        }
+
         setNewMessageText('');
     };
 
@@ -359,14 +412,106 @@ const ChatroomPage: React.FC = () => {
         }
     };
 
+    const handleRightClickMessage = (event: React.MouseEvent, message: ChatMessageResponse) => {
+        event.preventDefault();
+        setContextMenuVisible(true);
+        setContextMenuPosition({ x: event.clientX, y: event.clientY });
+        setSelectedMessageForContext(message);
+    };
+
+    const handleReplyMessage = () => {
+        if (selectedMessageForContext) {
+            toast.info(`Reply to message: "${selectedMessageForContext.text}"`);
+        }
+        setContextMenuVisible(false);
+    };
+
+    const handleEditMessage = () => {
+        if (selectedMessageForContext) {
+            setNewMessageText(selectedMessageForContext.text.endsWith(" (1)") ? selectedMessageForContext.text.slice(0, -4) : selectedMessageForContext.text);
+            setEditingMessageId(selectedMessageForContext.id);
+            toast.info(`Editing message...`);
+        }
+        setContextMenuVisible(false);
+    };
+
+    const handleDeleteMessage = () => {
+        if (selectedMessageForContext && chatroomId && stompClient.current && stompClient.current.connected) {
+            const jwtToken = getJwtToken();
+            if (!jwtToken) {
+                toast.error('Authentication required to delete messages.');
+                setContextMenuVisible(false);
+                return;
+            }
+
+            const headers = { Authorization: `Bearer ${jwtToken}` };
+            const deleteMessagePayload = {
+                chatroomId: chatroomId,
+                messageId: selectedMessageForContext.id,
+            };
+
+            stompClient.current.send(`/app/chat.deleteMessage`, headers, JSON.stringify(deleteMessagePayload));
+            toast.success("Message deleted!");
+        } else {
+            toast.error("Failed to delete message.");
+        }
+        setContextMenuVisible(false);
+    };
+
+    const handleCopyText = () => {
+        if (selectedMessageForContext) {
+            const el = document.createElement('textarea');
+            el.value = selectedMessageForContext.text;
+            document.body.appendChild(el);
+            el.select();
+            document.execCommand('copy');
+            document.body.removeChild(el);
+            toast.success('Message copied to clipboard!');
+        }
+        setContextMenuVisible(false);
+    };
+
+    const handleReportMessage = () => {
+        if (selectedMessageForContext) {
+            toast.error(`Reporting message: "${selectedMessageForContext.text}"`);
+        }
+        setContextMenuVisible(false);
+    };
+
+    const handlePinMessage = () => {
+        if (selectedMessageForContext) {
+            toast.info(`Pin message: "${selectedMessageForContext.text}"`);
+        }
+        setContextMenuVisible(false);
+    };
+
+    const handleCancelEdit = () => {
+        setNewMessageText('');
+        setEditingMessageId(null);
+        toast.info("Edit cancelled.");
+    };
+
+    if (loadingChatroom) {
+        return <div className="flex justify-center items-center h-screen text-xl">Loading chatroom details...</div>;
+    }
+
+    if (errorChatroom) {
+        return (
+            <div className="flex justify-center items-center h-screen flex-col">
+                <p className="text-xl text-red-500">{errorChatroom}</p>
+                <button onClick={() => navigate('/dashboard')} className="mt-4 px-4 py-2 bg-blue-500 text-white rounded">Go to Dashboard</button>
+            </div>
+        );
+    }
+
     return (
         <div className="h-screen bg-background text-foreground flex flex-col overflow-hidden">
             <Navbar />
 
-            <main className="flex-grow flex min-h-0">
+            <main className="flex-grow flex min-h-0 pt-24 md:pt-0">
                 <button
                     onClick={toggleSidebar}
-                    className="md:hidden fixed top-[calc(64px+1rem)] left-4 z-40 p-2 rounded-md bg-card border border-border text-foreground shadow-md"
+                    className={`md:hidden fixed top-28 left-4 z-40 p-2 rounded-md bg-card border border-border text-foreground shadow-md ${isSidebarOpen ? 'hidden' : ''}`}
                 >
                     {isSidebarOpen ? (
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -385,7 +530,7 @@ const ChatroomPage: React.FC = () => {
                         fixed left-0 z-30 transform transition-transform duration-300 ease-in-out
                         md:relative md:translate-x-0 md:flex md:top-auto md:h-auto md:z-auto
                         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-                        h-[calc(100vh-64px)] top-16
+                        top-24 h-[calc(100vh-10rem)] md:h-auto
                         overflow-y-auto
                     `}
                 >
@@ -395,8 +540,8 @@ const ChatroomPage: React.FC = () => {
                         <button
                             onClick={handleConnectRandom}
                             className="bg-accent text-accent-foreground px-4 py-2 rounded-md font-semibold text-sm w-full
-                                       hover:bg-accent/90 transition-colors duration-300 shadow-sm
-                                       focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-50"
+                                        hover:bg-accent/90 transition-colors duration-300 shadow-sm
+                                        focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-50"
                         >
                             Connect with a random?
                         </button>
@@ -436,7 +581,6 @@ const ChatroomPage: React.FC = () => {
                     <h1 className="text-3xl font-bold mb-2 text-center text-primary">
                         {loadingChatroom ? 'Loading Chatroom...' : errorChatroom ? 'Error' : `${chatroomName} Chatroom`}
                     </h1>
-                    {/* Display the interest name prominently */}
                     {!loadingChatroom && !errorChatroom && chatroomName && (
                         <div className="text-center text-lg text-muted-foreground font-medium mb-4">
                             Interest: <span className="text-accent-foreground">{chatroomName}</span>
@@ -449,7 +593,7 @@ const ChatroomPage: React.FC = () => {
                         </div>
                     )}
 
-                    <div className="flex-grow overflow-y-auto space-y-4 pr-2 custom-scrollbar min-h-0">
+                    <div className="flex-grow overflow-y-auto space-y-4 pr-2 custom-scrollbar min-h-0 pb-24">
                         {messages.length === 0 ? (
                             <p className="text-center text-muted-foreground mt-10">No messages yet. Start the conversation!</p>
                         ) : (
@@ -461,6 +605,7 @@ const ChatroomPage: React.FC = () => {
                                     <div
                                         key={msg.id}
                                         className={`flex items-start space-x-3 ${isOwnMessage ? 'justify-end' : 'justify-start'}`}
+                                        onContextMenu={(e) => handleRightClickMessage(e, msg)}
                                     >
                                         {!isOwnMessage && (
                                             <img
@@ -499,7 +644,7 @@ const ChatroomPage: React.FC = () => {
                                                 className={`
                                                     rounded-lg px-4 py-2 text-foreground break-words max-w-lg shadow-sm
                                                     ${isOwnMessage ? 'bg-blue-600 text-white' : 'bg-secondary'}
-                                                  `}
+                                                `}
                                             >
                                                 {isMediaMessage ? (
                                                     <a href={msg.text} target="_blank" rel="noopener noreferrer">
@@ -519,7 +664,15 @@ const ChatroomPage: React.FC = () => {
                                                         />
                                                     </a>
                                                 ) : (
-                                                    <p>{msg.text}</p>
+                                                    <p>
+                                                        {msg.text.endsWith(" (1)") ? (
+                                                            <>
+                                                                {msg.text.slice(0, -4)} <span className="text-xs text-muted italic">(edited)</span>
+                                                            </>
+                                                        ) : (
+                                                            msg.text
+                                                        )}
+                                                    </p>
                                                 )}
                                             </div>
                                         </div>
@@ -533,21 +686,30 @@ const ChatroomPage: React.FC = () => {
                     <div className="mt-4 flex items-center space-x-3 border-t border-border pt-4">
                         <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="fixed bottom-0 left-0 right-0 bg-background p-4 border-t border-border flex items-center space-x-3 z-50">
                             <input
+                                ref={messageInputRef}
                                 type="text"
-                                placeholder="Type your message..."
+                                placeholder={editingMessageId ? "Edit your message..." : "Type your message..."}
                                 className="flex-grow p-3 rounded-lg bg-input border border-border text-foreground
                                 focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
                                 value={newMessageText}
                                 onChange={(e) => setNewMessageText(e.target.value)}
-                                disabled={!stompClient.current?.connected || loadingChatroom}
+                                onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
                             />
+                            {editingMessageId && (
+                                <button
+                                    onClick={handleCancelEdit}
+                                    className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-md transition-colors duration-200"
+                                >
+                                    Cancel
+                                </button>
+                            )}
                             <button
                                 type="submit"
                                 className="bg-primary text-primary-foreground px-5 py-3 rounded-lg font-semibold
                                 hover:bg-primary/90 transition-colors duration-300 disabled:opacity-50"
                                 disabled={!stompClient.current?.connected || loadingChatroom || newMessageText.trim() === ''}
                             >
-                                Send
+                                {editingMessageId ? 'Update' : 'Send'}
                             </button>
                         </form>
                     </div>
@@ -563,6 +725,63 @@ const ChatroomPage: React.FC = () => {
                     user={selectedUser}
                     onClose={closeProfileModal}
                 />
+            )}
+
+            {contextMenuVisible && selectedMessageForContext && (
+                <div
+                    ref={contextMenuRef}
+                    className="absolute z-50 bg-card border border-border rounded-md shadow-lg py-1"
+                    style={{ top: contextMenuPosition.y, left: contextMenuPosition.x }}
+                >
+                    <ul className="text-sm">
+                        <li
+                            className="px-4 py-2 hover:bg-secondary cursor-pointer"
+                            onClick={handleReplyMessage}
+                        >
+                            Reply
+                        </li>
+                        {selectedMessageForContext.userId === currentUserId && (
+                            <>
+                                {selectedMessageForContext.text !== "[Message Deleted]" && (
+                                    <li
+                                        className="px-4 py-2 hover:bg-secondary cursor-pointer"
+                                        onClick={handleEditMessage}
+                                    >
+                                        Edit Message
+                                    </li>
+                                )}
+                                <li
+                                    className="px-4 py-2 hover:bg-secondary cursor-pointer text-red-500"
+                                    onClick={handleDeleteMessage}
+                                >
+                                    Delete Message
+                                </li>
+                            </>
+                        )}
+                        <li
+                            className="px-4 py-2 hover:bg-secondary cursor-pointer"
+                            onClick={handleCopyText}
+                        >
+                            Copy Text
+                        </li>
+                        {selectedMessageForContext.userId !== currentUserId && (
+                            <li
+                                className="px-4 py-2 hover:bg-secondary cursor-pointer"
+                                onClick={handleReportMessage}
+                            >
+                                Report Message
+                            </li>
+                        )}
+                        {currentUserId === 'ADMIN_USER_ID' && (
+                            <li
+                                className="px-4 py-2 hover:bg-secondary cursor-pointer"
+                                onClick={handlePinMessage}
+                            >
+                                Pin Message
+                            </li>
+                        )}
+                    </ul>
+                </div>
             )}
         </div>
     );
