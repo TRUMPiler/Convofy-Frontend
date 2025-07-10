@@ -20,34 +20,38 @@ interface MatchNotificationPayload {
     partnerId: string;
     partnerName: string;
     partnerAvatar: string;
-    sessionId:string;
+    sessionId: string;
 }
 
 const WaitingRoom: React.FC = () => {
     const navigate = useNavigate();
     const { interestId } = useParams<{ interestId: string }>();
     const [status, setStatus] = useState<"waiting" | "ready" | "error" | "Nothing">("Nothing");
-    const [otherUserEmail, setOtherUserEmail] = useState<string | null>(null);
     const [meetId, setMeetId] = useState<string | null>(null);
     const [sessionId, setSessionId] = useState<string | null>(null);
     const [interestName, setInterestName] = useState<string>("Loading interest...");
     const [partnerAvatar, setPartnerAvatar] = useState<string | null>(null);
     const [partnerName, setPartnerName] = useState<string | null>(null);
+    const [partnerId, setPartnerId] = useState<string | null>(null); // Explicitly store partnerId
 
     const initialCheckTriggered = useRef(false);
     const stompClientRef = useRef<Client | null>(null);
-    const matchFoundByWSRef = useRef(false);
+    const matchFoundByWSRef = useRef(false); // Flag to ensure WS match takes precedence
 
+    // Effect for initial checks and navigation to login/dashboard if prerequisites are not met
     useEffect(() => {
         if (!Cookies.get("userId")) {
+            toast.error("You need to be logged in to access the waiting room.");
             navigate("/login");
+            return;
         }
         if (!interestId) {
-            toast.error("Interest ID is missing from the URL.");
-            navigate("/dashboard");
+            toast.error("Interest ID is missing from the URL. Please select an interest.");
+            navigate("/dashboard"); // Or another appropriate page
         }
     }, [navigate, interestId]);
 
+    // Effect to fetch interest name for display
     useEffect(() => {
         const fetchInterestName = async () => {
             if (!interestId) {
@@ -72,57 +76,66 @@ const WaitingRoom: React.FC = () => {
         fetchInterestName();
     }, [interestId]);
 
+    // Callback for handling WebSocket match notifications
+    const handleMatchNotification = useCallback((data: MatchNotificationPayload) => {
+        const currentUserId = Cookies.get("userId");
+        if (data.userId === currentUserId) {
+            if (data.meetId && data.sessionId && data.partnerId) {
+                console.log("WebSocket: Match found! Setting status to ready and meetId:", data.meetId);
+                matchFoundByWSRef.current = true; // Set flag immediately to prevent HTTP check interference
+                setMeetId(data.meetId);
+                setPartnerId(data.partnerId);
+                setPartnerName(data.partnerName);
+                setPartnerAvatar(data.partnerAvatar);
+                setSessionId(data.sessionId);
+                Cookies.set("sessionId", data.sessionId); // Store sessionId in cookie
+                setStatus("ready"); // Update UI state to "ready"
+                toast.success(`Match found! Preparing your call with ${data.partnerName}...`);
+                
+                // Navigation will be handled by a separate useEffect that watches `status` and `meetId`
+                // This ensures all state updates are complete before navigating.
+            } else {
+                console.warn("WebSocket: Received incomplete match data, ignoring:", data);
+            }
+        } else {
+            console.log("WebSocket: Received message for another user, ignoring.");
+        }
+    }, []);
+
+    // Effect for establishing WebSocket connection and subscription
     useEffect(() => {
         const userId = Cookies.get("userId");
-        if (!userId) {
-            toast.error("User ID not found. Please log in.");
-            navigate("/login");
+        const jwtToken = Cookies.get("jwtToken");
+
+        if (!userId || !jwtToken) {
+            console.error("WebSocket setup failed: User ID or JWT token missing.");
+            // Initial useEffect handles navigation if user ID is missing.
             return;
         }
 
+        // Deactivate existing client if active to prevent multiple connections
         if (stompClientRef.current && stompClientRef.current.active) {
+            console.log("Deactivating existing STOMP client before new activation.");
             stompClientRef.current.deactivate();
         }
 
         const client = new Client({
             webSocketFactory: () => new SockJS("https://api.convofy.fun/ws"),
-            debug: (str) => console.log(str),
+            debug: (str) => console.log(`[STOMP Debug] ${str}`), // More specific debug log
             onConnect: () => {
-                console.log("Connected to WebSocket server");
+                console.log("Connected to WebSocket server.");
+                // Subscribe to the matches queue, sending JWT token for authorization
                 client.subscribe(`/queue/matches`, (message) => {
                     try {
                         const data: MatchNotificationPayload = JSON.parse(message.body);
                         console.log("Received WebSocket message:", data);
-                        
-                        if (data.userId === userId) {
-                            if (data.meetId && data.sessionId && data.partnerId) {
-                                console.log("WebSocket: Match found! Setting status to ready and meetId:", data.meetId);
-                                matchFoundByWSRef.current = true;
-                                setMeetId(data.meetId);
-                                setOtherUserEmail(data.partnerId);
-                                setPartnerName(data.partnerName); 
-                                setPartnerAvatar(data.partnerAvatar); 
-                                setSessionId(data.sessionId);
-                                Cookies.set("sessionId", data.sessionId);
-                                setStatus("ready");
-                                toast.success(`Match found! Preparing your call...`);
-
-                                navigate(
-                                    `/join/${data.meetId}?partnerName=${encodeURIComponent(data.partnerName || '')}&partnerAvatar=${encodeURIComponent(data.partnerAvatar || '')}&interestId=${encodeURIComponent(interestId || '')}&sessionId=${encodeURIComponent(data.sessionId || '')}&partnerId=${encodeURIComponent(data.partnerId || '')}`
-                                );
-
-                            } else {
-                                console.log("WebSocket: Received message without meetId, sessionId, or partnerId, ignoring:", data);
-                            }
-                        } else {
-                            console.log("WebSocket: Received message for another user, ignoring.");
-                        }
+                        handleMatchNotification(data); // Process the match notification
                     } catch (error) {
                         console.error("Error parsing WebSocket message:", error);
                         toast.error("Failed to process match data from server.");
                         setStatus("error");
                     }
-                }, { Authorization: `Bearer ${Cookies.get("jwtToken")}` });
+                }, { Authorization: `Bearer ${jwtToken}` }); // Ensure token is sent with subscription
             },
             onStompError: (frame) => {
                 console.error('Broker reported error: ' + frame.headers['message']);
@@ -131,31 +144,32 @@ const WaitingRoom: React.FC = () => {
                 setStatus("error");
             },
             onDisconnect: () => {
-                console.log("Disconnected from WebSocket server");
+                console.log("Disconnected from WebSocket server.");
             }
         });
 
         stompClientRef.current = client;
         client.activate();
 
+        // Cleanup function: Disconnect STOMP client when component unmounts
         return () => {
             if (stompClientRef.current && stompClientRef.current.active) {
                 console.log("Deactivating STOMP client on component unmount.");
                 stompClientRef.current.deactivate();
             }
         };
-    }, [navigate, interestId]);
+    }, [handleMatchNotification]); // Dependency on handleMatchNotification
 
+    // Callback for checking queue status via HTTP (initial entry or retry)
     const checkQueueStatus = useCallback(async () => {
-        if (matchFoundByWSRef.current) {
-            console.log("HTTP Check skipped: Match already found by WebSocket.");
+        // If a match was already found by WebSocket or status is ready, skip HTTP check
+        if (matchFoundByWSRef.current || status === "ready") {
+            console.log(`HTTP Check skipped: Match already found by WebSocket (${matchFoundByWSRef.current}) or status is already 'ready' (${status}).`);
             return;
         }
 
-        if (status === "ready") {
-            return;
-        }
-        if (status !== "waiting") {
+        // Only set status to "Nothing" if it's not already "waiting" or "error"
+        if (status !== "waiting" && status !== "error") {
             setStatus("Nothing");
         }
 
@@ -163,7 +177,7 @@ const WaitingRoom: React.FC = () => {
         const jwtToken = Cookies.get("jwtToken");
 
         if (!userId || !interestId || !jwtToken) {
-            toast.error("User ID, Interest ID, or JWT token missing.");
+            toast.error("User ID, Interest ID, or JWT token missing for queue check.");
             setStatus("error");
             return;
         }
@@ -186,14 +200,17 @@ const WaitingRoom: React.FC = () => {
                     const matchedPartnerId = response.data.data;
                     console.log("HTTP Check: Immediate match found with partner ID:", matchedPartnerId);
 
+                    // If match found via HTTP, immediately attempt to create meeting.
+                    // The backend should then send a WS notification to both participants,
+                    // which will be handled by handleMatchNotification and trigger navigation.
                     await axios.post(
                         "https://api.convofy.fun/api/meetings/create",
                         { userid1: userId, userid2: matchedPartnerId, interestId: interestId },
                         { headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwtToken}` } }
                     );
 
-                    setStatus("waiting");
-                    toast.info("Match found! Waiting for meeting details...", { duration: 5000 });
+                    setStatus("waiting"); // Still waiting for the WS notification to confirm match details
+                    toast.info("Match found! Waiting for meeting details via WebSocket...", { duration: 5000 });
 
                 } else {
                     console.log("HTTP Check: User already in queue, waiting for a partner.");
@@ -205,7 +222,7 @@ const WaitingRoom: React.FC = () => {
                 setStatus("waiting");
                 toast.info("You've joined the queue. Waiting for a match...", { duration: 5000 });
             } else if (response.status === 409) {
-                toast.error(response.data.message || "You are currently in a call/busy.");
+                toast.error(response.data.message || "You are currently in a call or busy.");
                 setStatus("error");
             } else {
                 toast.error(response.data.message || "Failed to check queue status.");
@@ -217,14 +234,31 @@ const WaitingRoom: React.FC = () => {
             toast.error(errorMessage);
             setStatus("error");
         }
-    }, [interestId, status]);
+    }, [interestId, status]); // Dependency on status to prevent re-runs if already ready/waiting
 
+    // Effect to trigger initial queue status check only once on component mount
     useEffect(() => {
         if (!initialCheckTriggered.current && interestId) {
             initialCheckTriggered.current = true;
             checkQueueStatus();
         }
     }, [checkQueueStatus, interestId]);
+
+    // Effect to handle navigation once a match is ready and all data is set
+    useEffect(() => {
+        if (status === "ready" && meetId && sessionId && partnerName && partnerAvatar && interestId && partnerId) {
+            const queryParams = new URLSearchParams({
+                partnerName: partnerName,
+                partnerAvatar: partnerAvatar,
+                interestId: interestId,
+                sessionId: sessionId,
+                partnerId: partnerId,
+            }).toString();
+            console.log("Navigating to meeting:", `/join/${meetId}?${queryParams}`);
+            navigate(`/join/${meetId}?${queryParams}`);
+        }
+    }, [status, meetId, sessionId, partnerName, partnerAvatar, interestId, partnerId, navigate]);
+
 
     const handleLeaveQueue = async () => {
         const userId = Cookies.get("userId");
@@ -265,11 +299,20 @@ const WaitingRoom: React.FC = () => {
                     <div className="text-center p-6 bg-card rounded-xl shadow-lg border border-border max-w-md w-full mx-4">
                         <p className="text-2xl font-bold mb-4 text-primary">Meeting Ready!</p>
                         <p className="text-lg mb-4">You're matched with <span className="font-semibold text-accent-foreground">{partnerName}</span>.</p>
+                        {partnerAvatar && (
+                            <img
+                                src={partnerAvatar}
+                                alt={`${partnerName}'s avatar`}
+                                className="w-24 h-24 rounded-full mx-auto mb-4 object-cover"
+                                onError={(e) => { e.currentTarget.src = `https://placehold.co/96x96/cccccc/333333?text=Avatar`; }} // Fallback image
+                            />
+                        )}
                         <p className="text-sm text-muted-foreground mb-6">Meeting ID: <span className="font-mono bg-secondary px-2 py-1 rounded-md">{meetId}</span></p>
+                        {/* The button's onClick now directly triggers navigation, but the main navigation is handled by the useEffect */}
                         <button
                             className="bg-green-600 text-white py-3 px-8 rounded-lg font-bold text-lg
                                          hover:bg-green-700 transition-colors duration-300 shadow-md transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-75"
-                             onClick={() => navigate(`/join/${meetId}?partnerName=${encodeURIComponent(partnerName || '')}&partnerAvatar=${encodeURIComponent(partnerAvatar || '')}&interestId=${encodeURIComponent(interestId || '')}&sessionId=${encodeURIComponent(sessionId || '')}&partnerId=${encodeURIComponent(otherUserEmail || '')}`)}>
+                            onClick={() => navigate(`/join/${meetId}?partnerName=${encodeURIComponent(partnerName || '')}&partnerAvatar=${encodeURIComponent(partnerAvatar || '')}&interestId=${encodeURIComponent(interestId || '')}&sessionId=${encodeURIComponent(sessionId || '')}&partnerId=${encodeURIComponent(partnerId || '')}`)}>
                             Join Meeting
                         </button>
                     </div>
