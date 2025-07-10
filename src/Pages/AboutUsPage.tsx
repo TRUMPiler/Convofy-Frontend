@@ -1,5 +1,5 @@
 import React from 'react';
-import Navbar from './Sub-parts/NavigationBar'; // Adjust path if necessary
+import Navbar from './Sub-parts/NavigationBar'; 
 
 const AboutUsPage: React.FC = () => {
     return (
@@ -21,10 +21,10 @@ const AboutUsPage: React.FC = () => {
                 <section className="bg-card p-6 rounded-lg shadow-lg mb-8">
                     <h2 className="text-2xl font-semibold text-accent-foreground mb-4">What We Offer</h2>
                     <ul className="list-disc list-inside space-y-2 text-lg">
-                        <li>**Instant Connections:** Get matched with users interested in the same topics in real-time.</li>
-                        <li>**Topic-Based Chatrooms:** Dive into conversations centered around specific interests, hobbies, or subjects.</li>
-                        <li>**Anonymous & Safe:** Chat freely without revealing personal information unless you choose to. Your privacy is our priority.</li>
-                        <li>**Seamless Experience:** A clean, intuitive interface designed for easy navigation and enjoyable conversations.</li>
+                        <li>Instant Connections:Get matched with users interested in the same topics in real-time.</li>
+                        <li>Topic-Based Chatrooms: Dive into conversations centered around specific interests, hobbies, or subjects.</li>
+                        <li>Anonymous & Safe: Chat freely without revealing personal information unless you choose to. Your privacy is our priority.</li>
+                        <li>Seamless Experience: A clean, intuitive interface designed for easy navigation and enjoyable conversations.</li>
                     </ul>
                 </section>
 
