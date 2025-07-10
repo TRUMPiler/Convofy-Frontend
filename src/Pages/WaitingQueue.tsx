@@ -16,11 +16,18 @@ interface WaitingQueueInterestDTO {
 interface MatchNotificationPayload {
     meetId: string;
     message: string;
-    userId: string;
-    partnerId: string;
+    userId: string; // The recipient user's ID
+    partnerId: string; // Partner's ID
     partnerName: string;
     partnerAvatar: string;
     sessionId: string;
+}
+
+// Assuming the backend's Response structure
+interface ApiResponse<T> {
+    success: boolean;
+    message: string | null;
+    data: T | null;
 }
 
 const WaitingRoom: React.FC = () => {
@@ -32,7 +39,7 @@ const WaitingRoom: React.FC = () => {
     const [interestName, setInterestName] = useState<string>("Loading interest...");
     const [partnerAvatar, setPartnerAvatar] = useState<string | null>(null);
     const [partnerName, setPartnerName] = useState<string | null>(null);
-    const [partnerId, setPartnerId] = useState<string | null>(null); // Explicitly store partnerId
+    const [partnerId, setPartnerId] = useState<string | null>(null);
 
     const initialCheckTriggered = useRef(false);
     const stompClientRef = useRef<Client | null>(null);
@@ -47,7 +54,7 @@ const WaitingRoom: React.FC = () => {
         }
         if (!interestId) {
             toast.error("Interest ID is missing from the URL. Please select an interest.");
-            navigate("/dashboard"); // Or another appropriate page
+            navigate("/dashboard");
         }
     }, [navigate, interestId]);
 
@@ -59,7 +66,8 @@ const WaitingRoom: React.FC = () => {
                 return;
             }
             try {
-                const response = await axios.get(`https://api.convofy.fun/api/interests/${interestId}`);
+                // IMPORTANT: Use the correct production API URL here if different from localhost
+                const response = await axios.get(`http://localhost:8080/api/interests/${interestId}`);
                 if (response.data.success && response.data.data && response.data.data.name) {
                     setInterestName(response.data.data.name);
                 } else {
@@ -76,7 +84,7 @@ const WaitingRoom: React.FC = () => {
         fetchInterestName();
     }, [interestId]);
 
-    // Callback for handling WebSocket match notifications
+    // Callback for handling WebSocket match notifications (for the waiting person)
     const handleMatchNotification = useCallback((data: MatchNotificationPayload) => {
         const currentUserId = Cookies.get("userId");
         if (data.userId === currentUserId) {
@@ -88,12 +96,9 @@ const WaitingRoom: React.FC = () => {
                 setPartnerName(data.partnerName);
                 setPartnerAvatar(data.partnerAvatar);
                 setSessionId(data.sessionId);
-                Cookies.set("sessionId", data.sessionId); // Store sessionId in cookie
+                Cookies.set("sessionId", data.sessionId);
                 setStatus("ready"); // Update UI state to "ready"
                 toast.success(`Match found! Preparing your call with ${data.partnerName}...`);
-                
-                // Navigation will be handled by a separate useEffect that watches `status` and `meetId`
-                // This ensures all state updates are complete before navigating.
             } else {
                 console.warn("WebSocket: Received incomplete match data, ignoring:", data);
             }
@@ -109,33 +114,31 @@ const WaitingRoom: React.FC = () => {
 
         if (!userId || !jwtToken) {
             console.error("WebSocket setup failed: User ID or JWT token missing.");
-            // Initial useEffect handles navigation if user ID is missing.
             return;
         }
 
-        // Deactivate existing client if active to prevent multiple connections
         if (stompClientRef.current && stompClientRef.current.active) {
             console.log("Deactivating existing STOMP client before new activation.");
             stompClientRef.current.deactivate();
         }
 
         const client = new Client({
-            webSocketFactory: () => new SockJS("https://api.convofy.fun/ws"),
-            debug: (str) => console.log(`[STOMP Debug] ${str}`), // More specific debug log
+            // IMPORTANT: Use the correct production WebSocket URL here if different from localhost
+            webSocketFactory: () => new SockJS("http://localhost:8080/ws"),
+            debug: (str) => console.log(`[STOMP Debug] ${str}`),
             onConnect: () => {
                 console.log("Connected to WebSocket server.");
-                // Subscribe to the matches queue, sending JWT token for authorization
                 client.subscribe(`/queue/matches`, (message) => {
                     try {
                         const data: MatchNotificationPayload = JSON.parse(message.body);
                         console.log("Received WebSocket message:", data);
-                        handleMatchNotification(data); // Process the match notification
+                        handleMatchNotification(data);
                     } catch (error) {
                         console.error("Error parsing WebSocket message:", error);
                         toast.error("Failed to process match data from server.");
                         setStatus("error");
                     }
-                }, { Authorization: `Bearer ${jwtToken}` }); // Ensure token is sent with subscription
+                }, { Authorization: `Bearer ${jwtToken}` });
             },
             onStompError: (frame) => {
                 console.error('Broker reported error: ' + frame.headers['message']);
@@ -151,24 +154,21 @@ const WaitingRoom: React.FC = () => {
         stompClientRef.current = client;
         client.activate();
 
-        // Cleanup function: Disconnect STOMP client when component unmounts
         return () => {
             if (stompClientRef.current && stompClientRef.current.active) {
                 console.log("Deactivating STOMP client on component unmount.");
                 stompClientRef.current.deactivate();
             }
         };
-    }, [handleMatchNotification]); // Dependency on handleMatchNotification
+    }, [handleMatchNotification]);
 
     // Callback for checking queue status via HTTP (initial entry or retry)
     const checkQueueStatus = useCallback(async () => {
-        // If a match was already found by WebSocket or status is ready, skip HTTP check
         if (matchFoundByWSRef.current || status === "ready") {
             console.log(`HTTP Check skipped: Match already found by WebSocket (${matchFoundByWSRef.current}) or status is already 'ready' (${status}).`);
             return;
         }
 
-        // Only set status to "Nothing" if it's not already "waiting" or "error"
         if (status !== "waiting" && status !== "error") {
             setStatus("Nothing");
         }
@@ -189,52 +189,59 @@ const WaitingRoom: React.FC = () => {
                 interestid: interestId,
             };
 
-            const response = await axios.post(
-                "https://api.convofy.fun/api/queue/check",
+            // First, check the queue status
+            // IMPORTANT: Use the correct production API URL here
+            const queueCheckResponse = await axios.post(
+                "http://localhost:8080/api/queue/check",
                 requestBody,
                 { headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwtToken}` } }
             );
 
-            if (response.status === 200) {
-                if (response.data.success && response.data.data) {
-                    const matchedPartnerId = response.data.data;
-                    console.log("HTTP Check: Immediate match found with partner ID:", matchedPartnerId);
+            if (queueCheckResponse.data.success && queueCheckResponse.data.data) {
+                const matchedPartnerId = queueCheckResponse.data.data;
+                console.log("HTTP Check: Immediate match found with partner ID:", matchedPartnerId);
 
-                    // If match found via HTTP, immediately attempt to create meeting.
-                    // The backend should then send a WS notification to both participants,
-                    // which will be handled by handleMatchNotification and trigger navigation.
-                    await axios.post(
-                        "https://api.convofy.fun/api/meetings/create",
-                        { userid1: userId, userid2: matchedPartnerId, interestId: interestId },
-                        { headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwtToken}` } }
-                    );
+                // If match found via HTTP, immediately attempt to create meeting.
+                // This user (the creator) will receive the MatchNotificationPayload directly in the HTTP response.
+                // The other user (the waiting one) will receive it via WebSocket.
+                // IMPORTANT: Use the correct production API URL here
+                const createMeetingResponse = await axios.post(
+                    "http://localhost:8080/api/meetings/create",
+                    { userid1: userId, userid2: matchedPartnerId, interestId: interestId },
+                    { headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwtToken}` } }
+                );
 
-                    setStatus("waiting"); // Still waiting for the WS notification to confirm match details
-                    toast.info("Match found! Waiting for meeting details via WebSocket...", { duration: 5000 });
-
+                if (createMeetingResponse.data.success && createMeetingResponse.data.data) {
+                    const data = createMeetingResponse.data.data;
+                    console.log("HTTP Create Meeting: Match found and details received:", data);
+                    // Update state directly from the HTTP response for the creator
+                    setMeetId(data.meetId);
+                    setPartnerId(data.partnerId);
+                    setPartnerName(data.partnerName);
+                    setPartnerAvatar(data.partnerAvatar);
+                    setSessionId(data.sessionId);
+                    Cookies.set("sessionId", data.sessionId);
+                    matchFoundByWSRef.current = true; // Set flag to prevent further HTTP checks
+                    setStatus("ready"); // Transition to ready state
+                    toast.success(`Match found! Preparing your call with ${data.partnerName}...`);
                 } else {
-                    console.log("HTTP Check: User already in queue, waiting for a partner.");
-                    setStatus("waiting");
-                    toast.info("You are already in the queue. Waiting for a match...", { duration: 5000 });
+                    toast.error(createMeetingResponse.data.message || "Failed to create meeting after match.");
+                    setStatus("error");
                 }
-            } else if (response.status === 201) {
-                console.log("HTTP Check: User added to queue, waiting for a partner.");
-                setStatus("waiting");
-                toast.info("You've joined the queue. Waiting for a match...", { duration: 5000 });
-            } else if (response.status === 409) {
-                toast.error(response.data.message || "You are currently in a call or busy.");
-                setStatus("error");
+
             } else {
-                toast.error(response.data.message || "Failed to check queue status.");
-                setStatus("error");
+                // User added to queue or already in queue, waiting for a partner via WebSocket
+                console.log("HTTP Check: User added to queue or already in queue, waiting for a partner.");
+                setStatus("waiting");
+                toast.info(queueCheckResponse.data.message || "You've joined the queue. Waiting for a match...", { duration: 5000 });
             }
         } catch (error: any) {
-            console.error("Error checking queue status via HTTP:", error);
+            console.error("Error checking queue status or creating meeting via HTTP:", error);
             const errorMessage = error.response?.data?.message || "An error occurred while checking queue status.";
             toast.error(errorMessage);
             setStatus("error");
         }
-    }, [interestId, status]); // Dependency on status to prevent re-runs if already ready/waiting
+    }, [interestId, status]);
 
     // Effect to trigger initial queue status check only once on component mount
     useEffect(() => {
@@ -271,8 +278,9 @@ const WaitingRoom: React.FC = () => {
 
         try {
             toast.info("Leaving the queue...");
+            // IMPORTANT: Use the correct production API URL here
             const response = await axios.get(
-                `https://api.convofy.fun/api/queue/leave/${userId}`,
+                `http://localhost:8080/api/queue/leave/${userId}`,
                 { headers: { Authorization: `Bearer ${jwtToken}` } }
             );
 
@@ -320,7 +328,7 @@ const WaitingRoom: React.FC = () => {
                 {status === "waiting" && (
                     <div className="text-center p-6">
                         <p className="text-3xl text-primary font-extrabold animate-pulse">Waiting for another participant...</p>
-                        
+
                         <div className="mt-8 flex justify-center">
                             <svg className="animate-spin h-10 w-10 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>

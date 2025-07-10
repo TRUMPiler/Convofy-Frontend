@@ -165,7 +165,7 @@ const ChatroomPage: React.FC = () => {
                     return;
                 }
 
-                const response = await axios.get(`https://api.convofy.fun/api/chat/history/${chatroomId}?page=0&size=50`, {
+                const response = await axios.get(`http://localhost:8080/api/chat/history/${chatroomId}?page=0&size=50`, {
                     headers: {
                         Authorization: `Bearer ${jwtToken}`,
                     },
@@ -200,7 +200,7 @@ const ChatroomPage: React.FC = () => {
             return;
         }
 
-        const socket = new SockJS('https://api.convofy.fun/ws');
+        const socket = new SockJS('http://localhost:8080/ws');
         stompClient.current = Stomp.over(socket);
 
         const headers = {
@@ -308,7 +308,7 @@ const ChatroomPage: React.FC = () => {
             try {
                 setLoadingChatroom(true);
                 setErrorChatroom(null);
-                const response = await axios.get(`https://api.convofy.fun/api/interests/${chatroomId}`);
+                const response = await axios.get(`http://localhost:8080/api/interests/${chatroomId}`);
 
                 if (response.data.success && response.data.data) {
                     setChatroomName(response.data.data.name);
@@ -742,7 +742,7 @@ const ChatroomPage: React.FC = () => {
                         </li> */}
                         {selectedMessageForContext.userId === currentUserId && (
                             <>
-                                {selectedMessageForContext.text !== "[Message Deleted]" && (
+                                {(selectedMessageForContext.text !== "[Message Deleted]" && (selectedMessageForContext.text !== "[Message deleted]")) && (
                                     <li
                                         className="px-4 py-2 hover:bg-secondary cursor-pointer"
                                         onClick={handleEditMessage}
@@ -750,12 +750,15 @@ const ChatroomPage: React.FC = () => {
                                         Edit Message
                                     </li>
                                 )}
-                                <li
-                                    className="px-4 py-2 hover:bg-secondary cursor-pointer text-red-500"
-                                    onClick={handleDeleteMessage}
-                                >
-                                    Delete Message
-                                </li>
+                                {(selectedMessageForContext.text !== "[Message Deleted]" && (selectedMessageForContext.text !== "[Message deleted]")) && (
+                                    <li
+                                        className="px-4 py-2 hover:bg-secondary text-red-500 cursor-pointer"
+                                        onClick={handleDeleteMessage}
+                                    >
+                                        Delete Message
+                                    </li>
+                                )}
+                            
                             </>
                         )}
                         <li

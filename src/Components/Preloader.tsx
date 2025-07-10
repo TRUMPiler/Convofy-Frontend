@@ -19,6 +19,7 @@ const Preloader: React.FC<PreloaderProps> = ({ children }) => {
         <div className="flex flex-col items-center">
           <img src="/DotsLoader.gif" alt="Loading..." className="h-24 w-24" />
           <p className="mt-4 text-white text-lg">Loading Website...</p>
+          
         </div>
       </div>
     );

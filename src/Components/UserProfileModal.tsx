@@ -31,7 +31,7 @@ const handleAddFriend=async()=>{
     try{
         const userId=Cookies.get("userId");
         const friendId=(user as OnlineUser).userId??(user as ChatMessageResponse).userId??"";
-    const response=await axios.post('https://api.convofy.fun/api/friends/add',{
+    const response=await axios.post('http://localhost:8080/api/friends/add',{
         "userId":userId,
         "friendId":friendId
     },{headers:{'Content-Type':'application/json'}});
