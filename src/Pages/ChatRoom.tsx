@@ -734,12 +734,12 @@ const ChatroomPage: React.FC = () => {
                     style={{ top: contextMenuPosition.y, left: contextMenuPosition.x }}
                 >
                     <ul className="text-sm">
-                        <li
+                        {/* <li
                             className="px-4 py-2 hover:bg-secondary cursor-pointer"
                             onClick={handleReplyMessage}
                         >
                             Reply
-                        </li>
+                        </li> */}
                         {selectedMessageForContext.userId === currentUserId && (
                             <>
                                 {selectedMessageForContext.text !== "[Message Deleted]" && (

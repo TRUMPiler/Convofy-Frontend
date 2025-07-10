@@ -34,7 +34,6 @@ function App() {
       <Route path="/Interests" element={<InterestsPage />} />
        <Route path="/ChatRoom/:chatroomId" element={<ChatroomPage/>} />
        <Route path='/about' element={<AboutUsPage />}/>
-       <Route path='/testingpreloader' element={<PreloaderTestPage />} />
        <Route path="*" element={<NotFound />} />
       </Routes>
       </Router>
