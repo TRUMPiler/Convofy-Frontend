@@ -165,7 +165,7 @@ const ChatroomPage: React.FC = () => {
                     return;
                 }
 
-                const response = await axios.get(`http://localhost:8080/api/chat/history/${chatroomId}?page=0&size=50`, {
+                const response = await axios.get(`https://api.convofy.fun/api/chat/history/${chatroomId}?page=0&size=50`, {
                     headers: {
                         Authorization: `Bearer ${jwtToken}`,
                     },
@@ -200,7 +200,7 @@ const ChatroomPage: React.FC = () => {
             return;
         }
 
-        const socket = new SockJS('http://localhost:8080/ws');
+        const socket = new SockJS('https://api.convofy.fun/ws');
         stompClient.current = Stomp.over(socket);
 
         const headers = {
@@ -308,7 +308,7 @@ const ChatroomPage: React.FC = () => {
             try {
                 setLoadingChatroom(true);
                 setErrorChatroom(null);
-                const response = await axios.get(`http://localhost:8080/api/interests/${chatroomId}`);
+                const response = await axios.get(`https://api.convofy.fun/api/interests/${chatroomId}`);
 
                 if (response.data.success && response.data.data) {
                     setChatroomName(response.data.data.name);

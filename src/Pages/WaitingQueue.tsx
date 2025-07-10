@@ -67,7 +67,7 @@ const WaitingRoom: React.FC = () => {
             }
             try {
                 // IMPORTANT: Use the correct production API URL here if different from localhost
-                const response = await axios.get(`http://localhost:8080/api/interests/${interestId}`);
+                const response = await axios.get(`https://api.convofy.fun/api/interests/${interestId}`);
                 if (response.data.success && response.data.data && response.data.data.name) {
                     setInterestName(response.data.data.name);
                 } else {
@@ -124,7 +124,7 @@ const WaitingRoom: React.FC = () => {
 
         const client = new Client({
             // IMPORTANT: Use the correct production WebSocket URL here if different from localhost
-            webSocketFactory: () => new SockJS("http://localhost:8080/ws"),
+            webSocketFactory: () => new SockJS("https://api.convofy.fun/ws"),
             debug: (str) => console.log(`[STOMP Debug] ${str}`),
             onConnect: () => {
                 console.log("Connected to WebSocket server.");
@@ -192,7 +192,7 @@ const WaitingRoom: React.FC = () => {
             // First, check the queue status
             // IMPORTANT: Use the correct production API URL here
             const queueCheckResponse = await axios.post(
-                "http://localhost:8080/api/queue/check",
+                "https://api.convofy.fun/api/queue/check",
                 requestBody,
                 { headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwtToken}` } }
             );
@@ -206,7 +206,7 @@ const WaitingRoom: React.FC = () => {
                 // The other user (the waiting one) will receive it via WebSocket.
                 // IMPORTANT: Use the correct production API URL here
                 const createMeetingResponse = await axios.post(
-                    "http://localhost:8080/api/meetings/create",
+                    "https://api.convofy.fun/api/meetings/create",
                     { userid1: userId, userid2: matchedPartnerId, interestId: interestId },
                     { headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwtToken}` } }
                 );
@@ -280,7 +280,7 @@ const WaitingRoom: React.FC = () => {
             toast.info("Leaving the queue...");
             // IMPORTANT: Use the correct production API URL here
             const response = await axios.get(
-                `http://localhost:8080/api/queue/leave/${userId}`,
+                `https://api.convofy.fun/api/queue/leave/${userId}`,
                 { headers: { Authorization: `Bearer ${jwtToken}` } }
             );
 

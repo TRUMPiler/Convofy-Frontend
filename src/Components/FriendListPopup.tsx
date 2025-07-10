@@ -47,7 +47,7 @@ const FriendListPopup: React.FC<FriendListPopupProps> = ({ isOpen, onClose, curr
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
-  const API_BASE_URL = 'http://localhost:8080/api/friends';
+  const API_BASE_URL = 'https://api.convofy.fun/api/friends';
 
   const fetchFriendData = useCallback(async () => {
     setLoading(true);
