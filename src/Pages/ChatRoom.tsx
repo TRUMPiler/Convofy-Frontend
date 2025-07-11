@@ -36,17 +36,26 @@ const isImageOrGifUrl = (url: string): boolean => {
     if (!url || typeof url !== 'string') {
         return false;
     }
+
+    const cleanedUrl = url.trim();
+
+    if (!cleanedUrl.startsWith('http://') && !cleanedUrl.startsWith('https://')) {
+        return false;
+    }
+
     const imageRegex = /\.(jpeg|jpg|png|gif|webp|bmp|svg)$/i;
+
     try {
-        const parsedUrl = new URL(url);
+        const parsedUrl = new URL(cleanedUrl);
         return imageRegex.test(parsedUrl.pathname) ||
-            parsedUrl.hostname.includes('imgur.com') ||
-            parsedUrl.hostname.includes('giphy.com') ||
-            parsedUrl.hostname.includes('tenor.com');
+               parsedUrl.hostname.includes('imgur.com') ||
+               parsedUrl.hostname.includes('giphy.com') ||
+               parsedUrl.hostname.includes('tenor.com');
     } catch (e) {
         return false;
     }
 };
+
 
 const ChatroomPage: React.FC = () => {
     const { chatroomId } = useParams<{ chatroomId: string }>();
@@ -223,13 +232,12 @@ const ChatroomPage: React.FC = () => {
                     const existingMessageIndex = prevMessages.findIndex(msg => msg.id === receivedMessage.id);
 
                     if (existingMessageIndex > -1) {
+                        
                         const updatedMessages = [...prevMessages];
-                        if (receivedMessage.text === "[Message Deleted]") {
-                            return updatedMessages.filter(msg => msg.id !== receivedMessage.id);
-                        }
                         updatedMessages[existingMessageIndex] = receivedMessage;
                         return updatedMessages;
                     } else {
+                        
                         if (isHistoryLoaded && receivedMessage.userId !== currentUserId) {
                             playMessageSound();
                         }
@@ -412,10 +420,27 @@ const ChatroomPage: React.FC = () => {
         }
     };
 
-    const handleRightClickMessage = (event: React.MouseEvent, message: ChatMessageResponse) => {
+    const showContextMenuForMessage = (event: React.MouseEvent | React.TouchEvent, message: ChatMessageResponse) => {
         event.preventDefault();
+
+        let clientX, clientY;
+
+        if (event.type === 'contextmenu') {
+            if ('touches' in event) {
+                clientX = event.touches[0].clientX;
+                clientY = event.touches[0].clientY;
+            } else {
+                clientX = event.clientX;
+                clientY = event.clientY;
+            }
+        } else {
+            const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+            clientX = rect.right;
+            clientY = rect.bottom;
+        }
+
         setContextMenuVisible(true);
-        setContextMenuPosition({ x: event.clientX, y: event.clientY });
+        setContextMenuPosition({ x: clientX, y: clientY });
         setSelectedMessageForContext(message);
     };
 
@@ -428,7 +453,11 @@ const ChatroomPage: React.FC = () => {
 
     const handleEditMessage = () => {
         if (selectedMessageForContext) {
-            setNewMessageText(selectedMessageForContext.text.endsWith(" (1)") ? selectedMessageForContext.text.slice(0, -4) : selectedMessageForContext.text);
+            let cleanedText = selectedMessageForContext.text;
+            while (cleanedText.endsWith(" (1)")) {
+                cleanedText = cleanedText.slice(0, -4);
+            }
+            setNewMessageText(cleanedText);
             setEditingMessageId(selectedMessageForContext.id);
             toast.info(`Editing message...`);
         }
@@ -460,8 +489,12 @@ const ChatroomPage: React.FC = () => {
 
     const handleCopyText = () => {
         if (selectedMessageForContext) {
+            let textToCopy = selectedMessageForContext.text;
+            while (textToCopy.endsWith(" (1)")) {
+                textToCopy = textToCopy.slice(0, -4);
+            }
             const el = document.createElement('textarea');
-            el.value = selectedMessageForContext.text;
+            el.value = textToCopy;
             document.body.appendChild(el);
             el.select();
             document.execCommand('copy');
@@ -599,13 +632,12 @@ const ChatroomPage: React.FC = () => {
                         ) : (
                             messages.map((msg) => {
                                 const isOwnMessage = msg.userId === currentUserId;
-                                const isMediaMessage = isImageOrGifUrl(msg.text);
 
                                 return (
                                     <div
                                         key={msg.id}
                                         className={`flex items-start space-x-3 ${isOwnMessage ? 'justify-end' : 'justify-start'}`}
-                                        onContextMenu={(e) => handleRightClickMessage(e, msg)}
+                                        onContextMenu={(e) => showContextMenuForMessage(e, msg)}
                                     >
                                         {!isOwnMessage && (
                                             <img
@@ -639,41 +671,69 @@ const ChatroomPage: React.FC = () => {
                                                 ) : (
                                                     <span className="font-semibold text-blue-500">You</span>
                                                 )}
+                                                <button
+                                                    className={`
+                                                        ml-1 p-0.5 rounded-md text-muted-foreground hover:text-foreground
+                                                        focus:outline-none focus:ring-2 focus:ring-ring
+                                                        transition-opacity duration-200
+                                                        block md:hidden
+                                                    `}
+                                                    onClick={(e) => showContextMenuForMessage(e, msg)}
+                                                    aria-label="Message options"
+                                                >
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                                        <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                                                    </svg>
+                                                </button>
                                             </div>
                                             <div
                                                 className={`
-                                                    rounded-lg px-4 py-2 text-foreground break-words max-w-lg shadow-sm
+                                                    rounded-lg px-4 py-2 text-foreground break-words max-w-lg shadow-sm select-none
                                                     ${isOwnMessage ? 'bg-blue-600 text-white' : 'bg-secondary'}
                                                 `}
                                             >
-                                                {isMediaMessage ? (
-                                                    <a href={msg.text} target="_blank" rel="noopener noreferrer">
-                                                        <img
-                                                            src={msg.text}
-                                                            alt="Shared content"
-                                                            className="max-w-xs md:max-w-sm lg:max-w-md h-auto rounded-md object-cover cursor-pointer"
-                                                            onError={(e) => {
-                                                                e.currentTarget.style.display = 'none';
-                                                                const parent = e.currentTarget.parentElement;
-                                                                if (parent) {
-                                                                    const textNode = document.createElement('span');
-                                                                    textNode.textContent = msg.text;
-                                                                    parent.appendChild(textNode);
-                                                                }
-                                                            }}
-                                                        />
-                                                    </a>
-                                                ) : (
-                                                    <p>
-                                                        {msg.text.endsWith(" (1)") ? (
+                                                {(() => {
+                                                    let contentToDisplay = msg.text;
+                                                    let wasEdited = false;
+
+                                                    while (contentToDisplay.endsWith(" (1)")) {
+                                                        contentToDisplay = contentToDisplay.slice(0, -4);
+                                                        wasEdited = true;
+                                                    }
+
+                                                    const isMedia = isImageOrGifUrl(contentToDisplay);
+
+                                                    if (isMedia) {
+                                                        return (
                                                             <>
-                                                                {msg.text.slice(0, -4)} <span className="text-xs text-muted italic">(edited)</span>
+                                                                <a href={contentToDisplay} target="_blank" rel="noopener noreferrer">
+                                                                    <img
+                                                                        src={contentToDisplay}
+                                                                        alt="Shared content"
+                                                                        className="max-w-xs md:max-w-sm lg:max-w-md h-auto rounded-md object-cover cursor-pointer"
+                                                                        onError={(e) => {
+                                                                            e.currentTarget.style.display = 'none';
+                                                                            const parent = e.currentTarget.parentElement;
+                                                                            if (parent) {
+                                                                                const textNode = document.createElement('span');
+                                                                                textNode.textContent = contentToDisplay;
+                                                                                parent.appendChild(textNode);
+                                                                            }
+                                                                        }}
+                                                                    />
+                                                                </a>
+                                                                {wasEdited && <span className="text-xs text-muted-foreground italic ml-1">(edited)</span>}
                                                             </>
-                                                        ) : (
-                                                            msg.text
-                                                        )}
-                                                    </p>
-                                                )}
+                                                        );
+                                                    } else {
+                                                        return (
+                                                            <p>
+                                                                {contentToDisplay}
+                                                                {wasEdited && <span className="text-xs text-muted-foreground italic ml-1">(edited)</span>}
+                                                            </p>
+                                                        );
+                                                    }
+                                                })()}
                                             </div>
                                         </div>
                                     </div>
@@ -684,7 +744,7 @@ const ChatroomPage: React.FC = () => {
                     </div>
 
                     <div className="mt-4 flex items-center space-x-3 border-t border-border pt-4">
-                        <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="fixed bottom-0 left-0 right-0 bg-background p-4 border-t border-border flex items-center space-x-3 z-50">
+                        <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="fixed bottom-0 left-0 right-0 bg-background py-4 px-2 md:px-4 border-t border-border flex items-center space-x-1 md:space-x-3 z-50">
                             <input
                                 ref={messageInputRef}
                                 type="text"
@@ -698,15 +758,15 @@ const ChatroomPage: React.FC = () => {
                             {editingMessageId && (
                                 <button
                                     onClick={handleCancelEdit}
-                                   className="px-3 py-2 bg-red-500 hover:bg-red-600 text-white rounded-md transition-colors duration-200 text-sm md:px-4 md:py-2"
+                                    className="px-2 py-2 bg-red-500 hover:bg-red-600 text-white rounded-md transition-colors duration-200 text-xs md:text-sm md:px-4 md:py-2"
                                 >
                                     Cancel
                                 </button>
                             )}
                             <button
                                 type="submit"
-                               className="bg-primary text-primary-foreground px-4 py-2 rounded-lg font-semibold
-+                                hover:bg-primary/90 transition-colors duration-300 disabled:opacity-50 text-sm md:px-5 md:py-3"
+                                className="bg-primary text-primary-foreground px-2 py-2 rounded-lg font-semibold
+                                hover:bg-primary/90 transition-colors duration-300 disabled:opacity-50 text-xs md:text-sm md:px-5 md:py-3"
                                 disabled={!stompClient.current?.connected || loadingChatroom || newMessageText.trim() === ''}
                             >
                                 {editingMessageId ? 'Update' : 'Send'}
@@ -716,7 +776,7 @@ const ChatroomPage: React.FC = () => {
                 </section>
             </main>
 
-            <footer className="p-4 text-center text-muted-foreground text-sm border-t border-border">
+            <footer className="p-4 text-center text-muted-foreground text-sm border-t border-border mt-auto">
                 &copy; {new Date().getFullYear()} Convofy.
             </footer>
 
@@ -734,15 +794,9 @@ const ChatroomPage: React.FC = () => {
                     style={{ top: contextMenuPosition.y, left: contextMenuPosition.x }}
                 >
                     <ul className="text-sm">
-                        {/* <li
-                            className="px-4 py-2 hover:bg-secondary cursor-pointer"
-                            onClick={handleReplyMessage}
-                        >
-                            Reply
-                        </li> */}
                         {selectedMessageForContext.userId === currentUserId && (
                             <>
-                                {(selectedMessageForContext.text !== "[Message Deleted]" && (selectedMessageForContext.text !== "[Message deleted]")) && (
+                                {(selectedMessageForContext.text !== "[Message Deleted]" && selectedMessageForContext.text !== "[Message deleted]") && (
                                     <li
                                         className="px-4 py-2 hover:bg-secondary cursor-pointer"
                                         onClick={handleEditMessage}
@@ -750,7 +804,7 @@ const ChatroomPage: React.FC = () => {
                                         Edit Message
                                     </li>
                                 )}
-                                {(selectedMessageForContext.text !== "[Message Deleted]" && (selectedMessageForContext.text !== "[Message deleted]")) && (
+                                {(selectedMessageForContext.text !== "[Message Deleted]" && selectedMessageForContext.text !== "[Message deleted]") && (
                                     <li
                                         className="px-4 py-2 hover:bg-secondary text-red-500 cursor-pointer"
                                         onClick={handleDeleteMessage}
@@ -758,7 +812,7 @@ const ChatroomPage: React.FC = () => {
                                         Delete Message
                                     </li>
                                 )}
-                            
+
                             </>
                         )}
                         <li

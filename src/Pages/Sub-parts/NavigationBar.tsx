@@ -67,7 +67,7 @@ const Navbar: React.FC = () => {
           </div>
 
           <ul className="hidden md:flex space-x-4">
-            <li className="cursor-pointer hover:text-blue-200" onClick={() => navigate("/home")}>
+            <li className="cursor-pointer hover:text-blue-200" onClick={() => navigate("/")}>
               Home
             </li>
             <li className="cursor-pointer hover:text-blue-200" onClick={() => navigate("/about")}>

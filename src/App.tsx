@@ -15,6 +15,7 @@ import Preloader from './Components/Preloader';
 import NotFound from './Components/PageNotFound';
 import AboutUsPage from './Pages/AboutUsPage';
 import PreloaderTestPage from './Pages/PreloaderTestPage';
+import MailForm from './Pages/Contact';
 
 function App() {
   return (
@@ -34,6 +35,7 @@ function App() {
       <Route path="/Interests" element={<InterestsPage />} />
        <Route path="/ChatRoom/:chatroomId" element={<ChatroomPage/>} />
        <Route path='/about' element={<AboutUsPage />}/>
+       <Route path="/contact" element={<MailForm />} />
        <Route path="*" element={<NotFound />} />
       </Routes>
       </Router>

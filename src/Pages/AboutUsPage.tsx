@@ -65,7 +65,7 @@ const AboutUsPage: React.FC = () => {
                                     GitHub
                                 </a>
                                 <a
-                                    href="https://www.linkedin.com/in/your-linkedin-profile" // Replace with actual LinkedIn profile
+                                    href="https://www.linkedin.com/in/naishal-doshi/"
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="text-primary hover:text-accent-foreground transition-colors duration-300 flex items-center gap-1"
@@ -76,7 +76,7 @@ const AboutUsPage: React.FC = () => {
                                     LinkedIn
                                 </a>
                                 <a
-                                    href="https://www.instagram.com/your-instagram-profile" // Replace with actual Instagram profile
+                                    href="https://www.instagram.com/_naishal_/" 
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="text-primary hover:text-accent-foreground transition-colors duration-300 flex items-center gap-1"
@@ -98,7 +98,7 @@ const AboutUsPage: React.FC = () => {
                     </p>
                     <div className="text-center">
                         <a
-                            href="/dashboard"
+                            href="/"
                             className="inline-block bg-primary text-primary-foreground px-8 py-3 rounded-lg font-semibold text-xl
                                        hover:bg-primary/90 transition-colors duration-300 shadow-md"
                         >
