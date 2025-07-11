@@ -81,7 +81,7 @@ const MailForm: React.FC = () => {
     <>
       <Navbar />
       <div className="min-h-screen grid items-center justify-center">
-        <div className="max-w-lg mx-auto mt-10 p-6 bg-white rounded-xl shadow-md">
+        {/* <div className="max-w-lg mx-auto mt-10 p-6 bg-white rounded-xl shadow-md">
           <h2 className="text-2xl font-bold mb-4 text-center">Send a Mail</h2>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
@@ -135,7 +135,8 @@ const MailForm: React.FC = () => {
               </div>
             )}
           </form>
-        </div>
+        </div> */}
+        <h1 className="text-4xl font-bold text-gray-800">Currently in development</h1>
       </div>
     </>
   );
