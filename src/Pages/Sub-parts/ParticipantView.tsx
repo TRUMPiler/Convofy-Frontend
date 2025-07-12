@@ -1,12 +1,19 @@
+// src/components/ParticipantView.tsx
+
+import React, { useEffect, useMemo, useRef } from "react";
 import { useParticipant } from "@videosdk.live/react-sdk";
-import { useEffect, useMemo, useRef } from "react";
 import ReactPlayer from "react-player";
 
+interface ParticipantViewProps {
+  participantId: string;
+  partnerAvatar?: string;
+  isLocalUser: boolean;
+}
 
-function ParticipantView({ participantId }: { participantId: string }) {
+const ParticipantView: React.FC<ParticipantViewProps> = ({ participantId, partnerAvatar, isLocalUser }) => {
   const micRef = useRef<HTMLAudioElement | null>(null);
 
-  const { webcamStream, micStream, webcamOn, micOn, isLocal, displayName } =
+  const { webcamStream, micStream, webcamOn, micOn, displayName } =
     useParticipant(participantId);
 
   const videoStream = useMemo(() => {
@@ -15,6 +22,7 @@ function ParticipantView({ participantId }: { participantId: string }) {
       mediaStream.addTrack(webcamStream.track);
       return mediaStream;
     }
+    return null; // This null return is what causes TypeScript to complain
   }, [webcamStream, webcamOn]);
 
   useEffect(() => {
@@ -22,46 +30,79 @@ function ParticipantView({ participantId }: { participantId: string }) {
       if (micOn && micStream) {
         const mediaStream = new MediaStream();
         mediaStream.addTrack(micStream.track);
-
         micRef.current.srcObject = mediaStream;
-        micRef.current
-          .play()
-          .catch((error) =>
-            console.error("videoElem.current.play() failed", error)
-          );
+        if (!isLocalUser) {
+          micRef.current
+            .play()
+            .catch((error) =>
+              console.error("Audio playback failed for participant:", displayName, error)
+            );
+        }
       } else {
         micRef.current.srcObject = null;
       }
     }
-  }, [micStream, micOn]);
+  }, [micStream, micOn, displayName, isLocalUser]);
+
+  const avatarToDisplay = useMemo(() => {
+    if (!webcamOn) {
+      if (isLocalUser) {
+        return `https://placehold.co/96x96/cccccc/333333?text=${displayName?.charAt(0) || '?'}`;
+      } else {
+        return partnerAvatar || `https://placehold.co/96x96/cccccc/333333?text=${displayName?.charAt(0) || '?'}`;
+      }
+    }
+    return null;
+  }, [webcamOn, isLocalUser, displayName, partnerAvatar]);
 
   return (
-    <div key={participantId}>
-      <p>
-        Participant: {displayName} | Webcam: {webcamOn ? "ON" : "OFF"} | Mic:{" "}
-        {micOn ? "ON" : "OFF"}
-      </p>
-      <audio ref={micRef} autoPlay muted={isLocal} />
-      {webcamOn && (
+    <div className="relative w-full h-full bg-gray-800 rounded-lg overflow-hidden shadow-lg flex items-center justify-center aspect-video sm:aspect-auto">
+      {webcamOn ? (
         <ReactPlayer
-          //
-          playsinline // extremely crucial prop
+          playsinline // crucial prop for mobile
           pip={false}
           light={false}
           controls={false}
-          muted={true}
+          muted={isLocalUser} // Mute local video to prevent echo
           playing={true}
-          //
-          url={videoStream}
-          //
-          height={"200px"}
-          width={"300px"}
+          // --- FIX IS HERE: Type assertion to MediaStream ---
+          url={videoStream as MediaStream}
+          // --------------------------------------------------
+          height="100%"
+          width="100%"
+          className="object-cover"
           onError={(err) => {
-            console.log(err, "participant video error");
+            console.error("Participant video error:", displayName, err);
           }}
         />
+      ) : (
+        <div className="flex flex-col items-center justify-center h-full w-full bg-gray-700 text-white text-lg p-4">
+          {avatarToDisplay && (
+            <img
+              src={avatarToDisplay}
+              alt={displayName || "Participant"}
+              className="w-24 h-24 rounded-full object-cover mb-2 border-2 border-primary"
+              onError={(e) => { e.currentTarget.src = `https://placehold.co/96x96/cccccc/333333?text=${displayName?.charAt(0) || '?'}`; }}
+            />
+          )}
+          {!avatarToDisplay && (
+            <div className="w-24 h-24 rounded-full bg-blue-500 flex items-center justify-center text-3xl font-bold">
+              {displayName ? displayName.charAt(0).toUpperCase() : '?'}
+            </div>
+          )}
+          <p className="mt-2 text-center">{displayName || "Unknown"}</p>
+          <p className="text-sm text-gray-400">Webcam OFF</p>
+        </div>
       )}
+      <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded-md">
+        {displayName} {isLocalUser && "(You)"}
+        <span className={`ml-2 ${micOn ? 'text-green-400' : 'text-red-400'}`}>
+          {micOn ? '🎤' : '🔇'}
+        </span>
+      </div>
+      <audio ref={micRef} autoPlay muted={isLocalUser} />
     </div>
   );
 }
+
 export default ParticipantView;

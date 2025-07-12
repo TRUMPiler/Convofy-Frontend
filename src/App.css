@@ -132,6 +132,23 @@
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: var(--text-secondary); /* Slightly lighter on hover */
 }
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #333; /* Dark background for scrollbar track */
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #555; /* Darker thumb */
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #777; /* Lighter thumb on hover */
+}
   body {
     @apply bg-background text-foreground;
   }
