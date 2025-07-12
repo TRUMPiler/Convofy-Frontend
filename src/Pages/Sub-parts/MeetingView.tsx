@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useMeeting } from "@videosdk.live/react-sdk";
-import ParticipantView from "./ParticipantView"; // Corrected import path
+import ParticipantView from "./ParticipantView";
 import axios from "axios";
 import Cookies from "js-cookie";
 import { toast } from "sonner";
@@ -29,6 +29,9 @@ const MeetingView: React.FC<MeetingViewProps> = ({ meetingId, sessionId, interes
     const [joined, setJoined] = useState<string | null>(null); // "JOINING", "JOINED", "ERROR"
     const stompClientRef = useRef<Client | null>(null);
 
+    const currentUserId = Cookies.get("userId");
+    const jwtToken = Cookies.get("jwtToken");
+
     // useMeeting hook from VideoSDK.live
     const { join, leave, toggleMic, toggleWebcam, participants, localParticipant } = useMeeting({
         onMeetingJoined: () => {
@@ -45,15 +48,11 @@ const MeetingView: React.FC<MeetingViewProps> = ({ meetingId, sessionId, interes
         }
     });
 
-    const currentUserId = Cookies.get("userId");
-    const jwtToken = Cookies.get("jwtToken");
-
     const joinMeeting = () => {
         setJoined("JOINING");
         join(); // Call VideoSDK's join method
     };
 
-    // Notify backend that the call has started
     const handleStartCall = useCallback(async () => {
         if (!currentUserId || !partnerId || !sessionId || !meetingId || !jwtToken) {
             toast.error("Missing user data or meeting info to start call.");
@@ -94,7 +93,6 @@ const MeetingView: React.FC<MeetingViewProps> = ({ meetingId, sessionId, interes
         }
     }, [currentUserId, partnerId, sessionId, meetingId, jwtToken]);
 
-    // Notify backend that the call has ended
     const handleEndCall = useCallback(async () => {
         if (!currentUserId || !sessionId || !jwtToken) {
             toast.error("Missing user data or session ID to end call.");
@@ -127,35 +125,32 @@ const MeetingView: React.FC<MeetingViewProps> = ({ meetingId, sessionId, interes
             console.error("Error notifying backend about call end:", error);
             toast.error(error.response?.data?.message || "An error occurred while ending the call on backend.");
         } finally {
-            leave(); // Always leave the VideoSDK meeting regardless of backend notification success
+            leave();
         }
     }, [currentUserId, sessionId, jwtToken, leave]);
 
     // WebSocket for call termination notifications
     useEffect(() => {
-        console.log("MeetingView WS Effect running with:", {
-            currentUserId,
-            sessionId,
-            interestId,
-            jwtToken,
-        });
-
+        // Only attempt to connect if essential data is available
         if (!currentUserId || !jwtToken || !sessionId || !interestId) {
-            console.warn("Cannot establish WebSocket for call-end: Missing essential data.");
-            return;
+            console.warn("WebSocket for call-end cannot be established: Missing essential data (userId, token, sessionId, interestId).");
+            // Do NOT return here immediately. Let the component render the "Ready to join?" state.
+            // If these values are expected to always be present when this component mounts,
+            // then the issue might be elsewhere (e.g., cookie access timing).
+            return; // We will still return if essential data is missing to prevent connection attempts with invalid data.
         }
 
+        // Deactivate any existing STOMP client to prevent multiple connections
         if (stompClientRef.current && stompClientRef.current.active) {
-            console.log("Deactivating existing STOMP client.");
+            console.log("Deactivating existing STOMP client for call-end notifications.");
             stompClientRef.current.deactivate();
         }
 
         const client = new Client({
-            webSocketFactory: () => new SockJS("https://api.convofy.fun/ws"), // IMPORTANT: Use your production WebSocket URL
+            webSocketFactory: () => new SockJS("https://api.convofy.fun/ws"),
             debug: (str) => console.log(`STOMP DEBUG: ${str}`),
             onConnect: () => {
                 console.log("Connected to WebSocket server for call-end notifications.");
-                // Subscribe to the general /call topic
                 const subscriptionPath = `/call`;
                 console.log(`Attempting to subscribe to: ${subscriptionPath}`);
 
@@ -165,12 +160,10 @@ const MeetingView: React.FC<MeetingViewProps> = ({ meetingId, sessionId, interes
                         console.log("Received call-end WebSocket message body:", message.body);
                         console.log("Parsed call-end WebSocket data:", data);
 
-                        console.log(`Comparing received sessionId (${data.sessionId}) with current sessionId prop (${sessionId})`);
-
                         if (data.sessionId === sessionId) {
                             toast.info(`Call ended by ${data.endedByUserId === currentUserId ? 'you' : 'the other user'}. Redirecting...`);
                             console.log(`Navigating to /test/${interestId}`);
-                            navigate(`/test/${interestId}`); // Redirect when call ends
+                            navigate(`/test/${interestId}`);
                         } else {
                             console.warn(`Received call-end notification for different session. Expected: ${sessionId}, Received: ${data.sessionId}`);
                         }
@@ -193,19 +186,18 @@ const MeetingView: React.FC<MeetingViewProps> = ({ meetingId, sessionId, interes
         stompClientRef.current = client;
         client.activate();
 
+        // Cleanup function for useEffect
         return () => {
             if (stompClientRef.current && stompClientRef.current.active) {
                 console.log("Deactivating STOMP client for call-end on component unmount.");
                 stompClientRef.current.deactivate();
             }
         };
-    }, [currentUserId, sessionId, interestId, jwtToken, navigate]);
+    }, [currentUserId, sessionId, interestId, jwtToken, navigate]); // Dependencies
 
-    // Determine if local participant's mic/webcam is on for button states
     const isMicOn = useMemo(() => localParticipant?.micOn, [localParticipant]);
     const isWebcamOn = useMemo(() => localParticipant?.webcamOn, [localParticipant]);
 
-    // Filter participants to ensure local participant is always first, then others
     const sortedParticipantIds = useMemo(() => {
         const ids = Array.from(participants.keys());
         const localId = localParticipant?.id;
@@ -243,7 +235,6 @@ const MeetingView: React.FC<MeetingViewProps> = ({ meetingId, sessionId, interes
 
     return (
         <div className="flex flex-col h-screen bg-gray-900 text-white">
-            {/* Header */}
             <header className="flex items-center justify-between p-4 bg-gray-800 shadow-md">
                 <h2 className="text-xl font-semibold text-primary-foreground">
                     Meeting with {partnerName}
@@ -254,7 +245,6 @@ const MeetingView: React.FC<MeetingViewProps> = ({ meetingId, sessionId, interes
                 </div>
             </header>
 
-            {/* Main Video Grid */}
             <div className="flex-grow grid grid-cols-1 md:grid-cols-2 gap-4 p-4 overflow-auto">
                 {joined === "JOINED" ? (
                     <>
@@ -262,7 +252,6 @@ const MeetingView: React.FC<MeetingViewProps> = ({ meetingId, sessionId, interes
                             <ParticipantView
                                 key={participantId}
                                 participantId={participantId}
-                                // Pass partner avatar only for the remote partner's view
                                 partnerAvatar={participantId !== localParticipant?.id ? partnerAvatar : undefined}
                                 isLocalUser={participantId === localParticipant?.id}
                             />
@@ -283,11 +272,10 @@ const MeetingView: React.FC<MeetingViewProps> = ({ meetingId, sessionId, interes
                 )}
             </div>
 
-            {/* Call Controls */}
             {joined === "JOINED" && (
                 <div className="flex justify-center items-center p-4 bg-gray-800 shadow-lg space-x-4">
                     <button
-                        onClick={()=>toggleMic()}
+                        onClick={() => toggleMic()}
                         className={`p-3 rounded-full ${isMicOn ? 'bg-blue-600' : 'bg-gray-600'} text-white shadow-md
                                    hover:scale-105 transition-transform duration-200 focus:outline-none focus:ring-4 focus:ring-blue-500 focus:ring-opacity-50`}
                         aria-label={isMicOn ? "Mute microphone" : "Unmute microphone"}
@@ -306,7 +294,7 @@ const MeetingView: React.FC<MeetingViewProps> = ({ meetingId, sessionId, interes
                     </button>
 
                     <button
-                        onClick={()=>toggleWebcam()}
+                        onClick={() => toggleWebcam()}
                         className={`p-3 rounded-full ${isWebcamOn ? 'bg-blue-600' : 'bg-gray-600'} text-white shadow-md
                                    hover:scale-105 transition-transform duration-200 focus:outline-none focus:ring-4 focus:ring-blue-500 focus:ring-opacity-50`}
                         aria-label={isWebcamOn ? "Turn off webcam" : "Turn on webcam"}
