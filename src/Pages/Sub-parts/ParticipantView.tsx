@@ -153,7 +153,7 @@ const ParticipantView: React.FC<ParticipantViewProps> = ({ participantId, partne
           height="100%"
           width="100%"
           className="object-cover"
-          style={isLocalUser ? { transform: 'scaleX(-1)' } : {}}
+          style={isLocalUser ? { transform: 'scaleX(-1)' } : { transform: 'scaleX(-1)' }}
           onError={(err) => {
             console.error("Participant video error:", displayName, err);
           }}
