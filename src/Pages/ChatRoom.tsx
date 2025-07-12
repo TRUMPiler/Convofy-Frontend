@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Navbar from './Sub-parts/NavigationBar';
 import axios from 'axios';
@@ -196,7 +196,8 @@ const ChatroomPage: React.FC = () => {
         fetchChatHistory();
     }, [chatroomId, currentUserId]);
 
-    useEffect(() => {
+    // Function to connect to WebSocket
+    const connectWebSocket = useCallback(() => {
         if (!chatroomId) {
             console.error('No chatroomId available for WebSocket connection.');
             return;
@@ -207,6 +208,14 @@ const ChatroomPage: React.FC = () => {
             toast.error('Authentication required to join chatroom.');
             console.error('JWT Token not found. Cannot establish WebSocket connection.');
             return;
+        }
+
+        // Deactivate existing client if active to prevent multiple connections
+        if (stompClient.current && stompClient.current.connected) {
+            console.log('Existing STOMP client is active, disconnecting before reconnect.');
+            stompClient.current.disconnect(() => {
+                console.log('Disconnected existing STOMP client.');
+            });
         }
 
         const socket = new SockJS('https://api.convofy.fun/ws');
@@ -232,12 +241,10 @@ const ChatroomPage: React.FC = () => {
                     const existingMessageIndex = prevMessages.findIndex(msg => msg.id === receivedMessage.id);
 
                     if (existingMessageIndex > -1) {
-                        
                         const updatedMessages = [...prevMessages];
                         updatedMessages[existingMessageIndex] = receivedMessage;
                         return updatedMessages;
                     } else {
-                        
                         if (isHistoryLoaded && receivedMessage.userId !== currentUserId) {
                             playMessageSound();
                         }
@@ -246,6 +253,7 @@ const ChatroomPage: React.FC = () => {
                 });
             }, headers);
 
+            // Send join room message after a short delay to ensure subscriptions are active
             setTimeout(() => {
                 stompClient.current.send(
                     `/app/chat.joinRoom`,
@@ -259,9 +267,18 @@ const ChatroomPage: React.FC = () => {
             console.error('WebSocket connection error:', error);
             toast.error('Failed to connect to chat. Please try again.');
         });
+    }, [chatroomId, currentUserId, audioUnlocked, isHistoryLoaded]); // Dependencies for connectWebSocket
 
+
+    // Initial WebSocket connection on component mount
+    useEffect(() => {
+        connectWebSocket();
+
+        // Cleanup on component unmount
         return () => {
             if (stompClient.current && stompClient.current.connected) {
+                const jwtToken = getJwtToken();
+                const headers = { Authorization: `Bearer ${jwtToken}` };
                 stompClient.current.send(
                     `/app/chat.leaveRoom`,
                     headers,
@@ -273,37 +290,49 @@ const ChatroomPage: React.FC = () => {
                 });
             }
         };
-    }, [chatroomId, currentUserId, audioUnlocked, isHistoryLoaded]);
+    }, [chatroomId, connectWebSocket]); // Re-run if chatroomId or connectWebSocket changes
 
+
+    // Page Visibility API to handle app background/foreground on mobile
     useEffect(() => {
-        const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-            if (stompClient.current && stompClient.current.connected) {
-                const jwtToken = getJwtToken();
-                const headers = { Authorization: `Bearer ${jwtToken}` };
+        const handleVisibilityChange = () => {
+            const jwtToken = getJwtToken();
+            const headers = { Authorization: `Bearer ${jwtToken}` };
 
-                stompClient.current.send(
-                    `/app/chat.leaveRoom`,
-                    headers,
-                    JSON.stringify({ chatroomId: chatroomId })
-                );
-                console.log(`Sent leave room message (on beforeunload) for chatroom: ${chatroomId}`);
-
-                try {
-                    stompClient.current.disconnect(() => {
-                        console.log('Attempted disconnect on beforeunload.');
-                    }, 0);
-                } catch (e) {
-                    console.error("Error during STOMP disconnect on beforeunload:", e);
+            if (document.visibilityState === 'hidden') {
+                // User is leaving the app/tab
+                console.log('Page is hidden. Attempting to send leave message and disconnect WS.');
+                if (stompClient.current && stompClient.current.connected) {
+                    try {
+                        stompClient.current.send(
+                            `/app/chat.leaveRoom`,
+                            headers,
+                            JSON.stringify({ chatroomId: chatroomId })
+                        );
+                        console.log(`Sent leave room message (on hidden) for chatroom: ${chatroomId}`);
+                        stompClient.current.disconnect(() => {
+                            console.log('Disconnected from WebSocket server (on hidden).');
+                        });
+                    } catch (e) {
+                        console.error("Error sending leave message or disconnecting on hidden:", e);
+                    }
+                }
+            } else if (document.visibilityState === 'visible') {
+                // User is returning to the app/tab
+                console.log('Page is visible. Attempting to reconnect WS.');
+                if (!stompClient.current || !stompClient.current.connected) {
+                    connectWebSocket(); // Attempt to reconnect
                 }
             }
         };
 
-        window.addEventListener('beforeunload', handleBeforeUnload);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
 
         return () => {
-            window.removeEventListener('beforeunload', handleBeforeUnload);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
-    }, [chatroomId]);
+    }, [chatroomId, connectWebSocket]);
+
 
     useEffect(() => {
         const fetchChatroomDetails = async () => {
