@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef } from "react";
 import { useParticipant } from "@videosdk.live/react-sdk";
 import ReactPlayer from "react-player";
+import NetworkStatusIndicator from './NetworkComponent'; // Import the new component
 
 interface ParticipantViewProps {
   participantId: string;
@@ -11,8 +12,8 @@ interface ParticipantViewProps {
 const ParticipantView: React.FC<ParticipantViewProps> = ({ participantId, partnerAvatar, isLocalUser }) => {
   const micRef = useRef<HTMLAudioElement | null>(null);
 
-  // Removed getAudioStats, getVideoStats, and networkQuality from useParticipant destructuring
-  const { webcamStream, micStream, webcamOn, micOn, displayName } =
+  // Destructure getAudioStats and getVideoStats to pass them to NetworkStatusIndicator
+  const { webcamStream, micStream, webcamOn, micOn, displayName, getAudioStats, getVideoStats } =
     useParticipant(participantId);
 
   const videoStream = useMemo(() => {
@@ -54,9 +55,6 @@ const ParticipantView: React.FC<ParticipantViewProps> = ({ participantId, partne
     return null;
   }, [webcamOn, isLocalUser, displayName, partnerAvatar]);
 
-  // Removed networkStats state, fetchNetworkStats useCallback, and the useEffect for polling
-
-
   return (
     <div className="relative w-full h-full bg-gray-800 rounded-lg overflow-hidden shadow-lg flex items-center justify-center aspect-video sm:aspect-auto">
       {webcamOn ? (
@@ -71,7 +69,7 @@ const ParticipantView: React.FC<ParticipantViewProps> = ({ participantId, partne
           height="100%"
           width="100%"
           className="object-cover"
-          style={isLocalUser ? { transform: 'scaleX(-1)' } : {transform: 'scaleX(-1)'}}
+          style={isLocalUser ? { transform: 'scaleX(-1)' } : {}}
           onError={(err) => {
             console.error("Participant video error:", displayName, err);
           }}
@@ -96,17 +94,27 @@ const ParticipantView: React.FC<ParticipantViewProps> = ({ participantId, partne
         </div>
       )}
 
-      {/* Display Name and Mic Status (Network Status removed) */}
+      {/* Display Name, Mic Status, and the NetworkStatusIndicator component */}
       <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded-md flex items-center">
         <span>{displayName} {isLocalUser && "(You)"}</span>
         <span className={`ml-2 ${micOn ? 'text-green-400' : 'text-red-400'}`}>
           {micOn ? '🎤' : '🔇'}
         </span>
-        {/* Removed the network status span */}
+        {/* Render the NetworkStatusIndicator here, passing necessary props */}
+        <NetworkStatusIndicator
+          participantId={participantId}
+          micOn={micOn}
+          webcamOn={webcamOn}
+          getAudioStats={getAudioStats}
+          getVideoStats={getVideoStats}
+          displayName={displayName}
+        />
       </div>
       <audio ref={micRef} autoPlay muted={isLocalUser} />
     </div>
   );
 }
 
-export default ParticipantView;
+// It's highly recommended to memoize ParticipantView itself to prevent
+// unnecessary re-renders from its parent (e.g., MeetingRoom).
+export default React.memo(ParticipantView);
