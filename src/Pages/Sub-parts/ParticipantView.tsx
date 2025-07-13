@@ -90,7 +90,7 @@ const ParticipantView: React.FC<ParticipantViewProps> = ({ participantId, partne
     // Only fetch stats if there's an active stream (webcam or mic)
     if (webcamOn || micOn) {
       fetchNetworkStats(); // Fetch immediately on mount/stream change
-      const interval = setInterval(fetchNetworkStats, 3000); // Fetch every 3 seconds
+      const interval = setInterval(fetchNetworkStats, 10000); // Fetch every 10 seconds
       return () => clearInterval(interval); // Cleanup interval on unmount
     } else {
       setNetworkStats(null); // Clear stats if no stream is active
@@ -193,4 +193,4 @@ const ParticipantView: React.FC<ParticipantViewProps> = ({ participantId, partne
   );
 }
 
-export default ParticipantView;
+export default React.memo(ParticipantView); // Use React.memo to optimize ParticipantView;
