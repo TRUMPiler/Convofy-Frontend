@@ -16,6 +16,7 @@ import NotFound from './Components/PageNotFound';
 import AboutUsPage from './Pages/AboutUsPage';
 import PreloaderTestPage from './Pages/PreloaderTestPage';
 import MailForm from './Pages/Contact';
+import Dashboard from './Pages/dashboard';
 
 function App() {
   return (
@@ -36,6 +37,7 @@ function App() {
        <Route path="/ChatRoom/:chatroomId" element={<ChatroomPage/>} />
        <Route path='/about' element={<AboutUsPage />}/>
        <Route path="/contact" element={<MailForm />} />
+       <Route path="/dashboard" element={<Dashboard />} />
        <Route path="*" element={<NotFound />} />
       </Routes>
       </Router>
