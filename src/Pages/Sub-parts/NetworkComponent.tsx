@@ -111,7 +111,7 @@ const NetworkStatusIndicator: React.FC<NetworkStatusIndicatorProps> = ({
 
   return (
     <>
-    // This is the only part of the UI that will re-render due to network stats changes
+   
     <span className={`ml-2 ${networkStatusColor}`}>
       {networkStatusText}
     </span>
