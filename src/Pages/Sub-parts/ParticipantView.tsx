@@ -1,3 +1,4 @@
+// Sub-parts/ParticipantView.tsx
 import React, { useEffect, useMemo, useRef } from "react";
 import { useParticipant } from "@videosdk.live/react-sdk";
 import ReactPlayer from "react-player";
@@ -12,7 +13,6 @@ interface ParticipantViewProps {
 const ParticipantView: React.FC<ParticipantViewProps> = ({ participantId, partnerAvatar, isLocalUser }) => {
   const micRef = useRef<HTMLAudioElement | null>(null);
 
-  // Destructure getAudioStats and getVideoStats to pass them to NetworkStatusIndicator
   const { webcamStream, micStream, webcamOn, micOn, displayName, getAudioStats, getVideoStats } =
     useParticipant(participantId);
 
@@ -56,7 +56,8 @@ const ParticipantView: React.FC<ParticipantViewProps> = ({ participantId, partne
   }, [webcamOn, isLocalUser, displayName, partnerAvatar]);
 
   return (
-    <div className="relative w-full h-full bg-gray-800 rounded-lg overflow-hidden shadow-lg flex items-center justify-center aspect-video sm:aspect-auto">
+    // Removed 'aspect-video sm:aspect-auto' from here
+    <div className="relative w-full h-full bg-gray-800 rounded-lg overflow-hidden shadow-lg flex items-center justify-center">
       {webcamOn ? (
         <ReactPlayer
           playsinline
@@ -68,8 +69,13 @@ const ParticipantView: React.FC<ParticipantViewProps> = ({ participantId, partne
           url={videoStream as MediaStream}
           height="100%"
           width="100%"
-          className="object-cover"
-          style={isLocalUser ? { transform: 'scaleX(-1)' } : {transform: 'scaleX(-1)'}}
+          // Added objectFit: 'cover' directly to ReactPlayer style
+          style={{
+            transform: 'scaleX(-1)', // Keep mirroring if intended
+            objectFit: 'cover', // This is crucial for fixing the aspect ratio issue
+            width: '100%', // Ensure it fills the container
+            height: '100%' // Ensure it fills the container
+          }}
           onError={(err) => {
             console.error("Participant video error:", displayName, err);
           }}

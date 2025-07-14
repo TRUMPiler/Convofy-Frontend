@@ -1,3 +1,4 @@
+// MeetingView.tsx
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useMeeting } from "@videosdk.live/react-sdk";
 import ParticipantView from "./ParticipantView"; // Assuming this path is correct
@@ -8,11 +9,13 @@ import { Client } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
 import { useNavigate } from "react-router-dom";
 
+// Import the new ChatPanel component
+import ChatPanel from './ChatPanel'; // This path needs to be adjusted if ChatPanel is in a different file
+
 interface CallChatMessage {
     id: string;
     senderId: string;
     senderName: string;
-    senderAvatar: string;
     content: string;
     timestamp: string;
 }
@@ -37,10 +40,8 @@ const MeetingView: React.FC<MeetingViewProps> = ({ meetingId, sessionId, interes
     const [joined, setJoined] = useState<string | null>(null);
     const stompClientRef = useRef<Client | null>(null);
 
-    const [callMessages, setCallMessages] = useState<CallChatMessage[]>([]);
-    const [newChatMessage, setNewChatMessage] = useState<string>('');
+    // State for chat visibility, now managed here and passed to ChatPanel
     const [isChatOpen, setIsChatOpen] = useState<boolean>(false);
-    const chatMessagesEndRef = useRef<HTMLDivElement>(null);
 
     const currentUserId = Cookies.get("userId");
     const currentUserName = Cookies.get("name")?.toString() ?? "Guest";
@@ -64,7 +65,6 @@ const MeetingView: React.FC<MeetingViewProps> = ({ meetingId, sessionId, interes
 
     const joinMeeting = () => {
         setJoined("JOINING");
-        // In a real app, you'd handle permissions here before joining
         join();
     };
 
@@ -174,15 +174,7 @@ const MeetingView: React.FC<MeetingViewProps> = ({ meetingId, sessionId, interes
                     }
                 }, { Authorization: `Bearer ${jwtToken}` });
 
-                client.subscribe(`/topic/meeting-chat/${meetingId}`, (message) => {
-                    try {
-                        const receivedMessage: CallChatMessage = JSON.parse(message.body);
-                        console.log("Received new chat message:", receivedMessage);
-                        setCallMessages((prevMessages) => [...prevMessages, receivedMessage]);
-                    } catch (error) {
-                        console.error("Error parsing chat WebSocket message:", error);
-                    }
-                }, { Authorization: `Bearer ${jwtToken}` });
+                // The chat subscription will now be handled within ChatPanel
             },
             onStompError: (frame) => {
                 console.error('Broker reported error for call/chat WS: ' + frame.headers['message']);
@@ -205,11 +197,6 @@ const MeetingView: React.FC<MeetingViewProps> = ({ meetingId, sessionId, interes
         };
     }, [currentUserId, sessionId, interestId, jwtToken, navigate, meetingId]);
 
-    useEffect(() => {
-        if (isChatOpen) {
-            chatMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-        }
-    }, [callMessages, isChatOpen]);
 
     const isMicOn = useMemo(() => localParticipant?.micOn, [localParticipant]);
     const isWebcamOn = useMemo(() => localParticipant?.webcamOn, [localParticipant]);
@@ -223,36 +210,6 @@ const MeetingView: React.FC<MeetingViewProps> = ({ meetingId, sessionId, interes
         return ids;
     }, [participants, localParticipant]);
 
-    const handleSendChatMessage = useCallback(() => {
-        if (!newChatMessage.trim() || !meetingId || !stompClientRef.current || !stompClientRef.current.active) {
-            return;
-        }
-
-        const jwtToken = Cookies.get("jwtToken");
-        if (!jwtToken) {
-            toast.error('Authentication required to send chat messages.');
-            return;
-        }
-
-        const messagePayload: CallChatMessage = {
-            id: crypto.randomUUID(),
-            senderId: currentUserId || "unknown",
-            senderName: currentUserName,
-            senderAvatar: currentUserAvatar,
-            content: newChatMessage.trim(),
-            timestamp: new Date().toISOString(),
-        };
-
-        // Publish the message using the STOMP client
-        stompClientRef.current.publish({
-            destination: `/app/meeting.sendMessage/${meetingId}`,
-            headers: { Authorization: `Bearer ${jwtToken}` },
-            body: JSON.stringify(messagePayload)
-        });
-
-        // Removed optimistic update: Message will now only be added when received via WebSocket
-        setNewChatMessage('');
-    }, [newChatMessage, meetingId, currentUserId, currentUserName, currentUserAvatar]);
 
     if (joined === "JOINING") {
         return (
@@ -291,17 +248,20 @@ const MeetingView: React.FC<MeetingViewProps> = ({ meetingId, sessionId, interes
                 </div>
             </header>
 
-            <div className="flex-grow flex relative"> {/* Main content area that grows */}
+          
+                {/* Changed overflow-auto to overflow-hidden here */}
                 <div className="flex-grow grid grid-cols-1 md:grid-cols-2 gap-4 p-4 overflow-auto"> {/* Participant views */}
                     {joined === "JOINED" ? (
                         <>
+                            {/* Apply h-full and w-full to each ParticipantView container */}
                             {sortedParticipantIds.map((participantId) => (
-                                <ParticipantView
-                                    key={participantId}
-                                    participantId={participantId}
-                                    partnerAvatar={participantId !== localParticipant?.id ? partnerAvatar : undefined}
-                                    isLocalUser={participantId === localParticipant?.id}
-                                />
+                                <div key={participantId} className="relative w-full h-full bg-gray-800 rounded-lg overflow-hidden">
+                                    <ParticipantView
+                                        participantId={participantId}
+                                        partnerAvatar={participantId !== localParticipant?.id ? partnerAvatar : undefined}
+                                        isLocalUser={participantId === localParticipant?.id}
+                                    />
+                                </div>
                             ))}
                         </>
                     ) : (
@@ -340,81 +300,18 @@ const MeetingView: React.FC<MeetingViewProps> = ({ meetingId, sessionId, interes
                     </button>
                 )}
 
-                {/* Chat Panel - positioned absolutely within the flex-grow content area */}
-                {joined === "JOINED" && (
-                    <div className={`absolute inset-y-0 right-0 z-40 bg-gray-700 rounded-lg shadow-xl flex flex-col transition-all duration-300 ease-in-out
-                                    ${isChatOpen ? 'w-full md:w-80 opacity-100 visible' : 'w-0 opacity-0 invisible'}`}>
-                        <div className="p-3 bg-gray-800 rounded-t-lg flex items-center justify-between">
-                            <h4 className="text-lg font-semibold">In-Call Chat</h4>
-                            <button onClick={() => setIsChatOpen(false)} className="text-gray-400 hover:text-white">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                                </svg>
-                            </button>
-                        </div>
-                        <div className="flex-grow overflow-y-auto p-3 space-y-3 custom-scrollbar">
-                            {callMessages.length === 0 ? (
-                                <p className="text-center text-gray-400 text-sm mt-4">No messages yet. Say hello!</p>
-                            ) : (
-                                callMessages.map((msg) => {
-                                    const isOwnMessage = msg.senderId === currentUserId;
-                                    return (
-                                        <div key={msg.id} className={`flex items-start ${isOwnMessage ? 'justify-end' : 'justify-start'} space-x-2`}>
-                                            {!isOwnMessage && (
-                                                <img
-                                                    src={msg.senderAvatar || 'https://placehold.co/40x40/cccccc/333333?text=U'}
-                                                    alt={msg.senderName}
-                                                    className="w-8 h-8 rounded-full object-cover flex-shrink-0"
-                                                    referrerPolicy='no-referrer'
-                                                />
-                                            )}
-                                            <div className={`flex flex-col ${isOwnMessage ? 'items-end' : 'items-start'} max-w-[70%]`}>
-                                                <span className={`text-xs ${isOwnMessage ? 'text-gray-400' : 'text-gray-300'}`}>
-                                                    {isOwnMessage ? 'You' : msg.senderName}
-                                                </span>
-                                                <div className={`rounded-lg px-3 py-2 text-sm break-words ${isOwnMessage ? 'bg-blue-500 text-white' : 'bg-gray-600 text-white'}`}>
-                                                    {msg.content}
-                                                </div>
-                                                <span className="text-xs text-gray-400 mt-1">
-                                                    {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                </span>
-                                            </div>
-                                            {isOwnMessage && (
-                                                <img
-                                                    src={currentUserAvatar || 'https://placehold.co/40x40/cccccc/333333?text=You'}
-                                                    alt="You"
-                                                    className="w-8 h-8 rounded-full object-cover flex-shrink-0"
-                                                    referrerPolicy='no-referrer'
-                                                />
-                                            )}
-                                        </div>
-                                    );
-                                })
-                            )}
-                            <div ref={chatMessagesEndRef} />
-                        </div>
-                        <div className="p-3 bg-gray-800 rounded-b-lg">
-                            <form onSubmit={(e) => { e.preventDefault(); handleSendChatMessage(); }} className="flex space-x-2">
-                                <input
-                                    type="text"
-                                    value={newChatMessage}
-                                    onChange={(e) => setNewChatMessage(e.target.value)}
-                                    placeholder="Type a message..."
-                                    className="flex-grow p-2 rounded-lg bg-gray-700 border border-gray-600 text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                />
-                                <button
-                                    type="submit"
-                                    className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center"
-                                    disabled={!newChatMessage.trim()}
-                                >
-                                    {/* Send Button Image Icon */}
-                                    <img width="24" height="24" src="https://img.icons8.com/material-sharp/24/sent.png" alt="Send" />
-                                </button>
-                            </form>
-                        </div>
-                    </div>
-                )}
-            </div>
+                {/* Render the ChatPanel component */}
+                <ChatPanel
+                    isOpen={isChatOpen}
+                    onClose={() => setIsChatOpen(false)}
+                    meetingId={meetingId}
+                    currentUserId={currentUserId}
+                    currentUserName={currentUserName}
+                    currentUserAvatar={currentUserAvatar}
+                    jwtToken={jwtToken}
+                    stompClientRef={stompClientRef}
+                />
+           
 
             <footer className="flex-shrink-0 flex justify-center items-center p-4 bg-gray-800 shadow-lg space-x-4">
                 {joined === "JOINED" && (
