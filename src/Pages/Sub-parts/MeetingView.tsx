@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useMeeting } from "@videosdk.live/react-sdk";
-import ParticipantView from "./Sub-parts/ParticipantView"; // Assuming this path is correct
+import ParticipantView from "./ParticipantView"; // Assuming this path is correct
 import axios from "axios";
 import Cookies from "js-cookie";
 import { toast } from "sonner";
