@@ -249,8 +249,7 @@ const MeetingView: React.FC<MeetingViewProps> = ({ meetingId, sessionId, interes
             body: JSON.stringify(messagePayload)
         });
 
-        // Optimistically add message to local state for immediate display
-        setCallMessages((prevMessages) => [...prevMessages, messagePayload]);
+        // Removed optimistic update: Message will now only be added when received via WebSocket
         setNewChatMessage('');
     }, [newChatMessage, meetingId, currentUserId, currentUserName, currentUserAvatar]);
 
@@ -318,7 +317,7 @@ const MeetingView: React.FC<MeetingViewProps> = ({ meetingId, sessionId, interes
                 )}
             </div>
 
-            {/* Chat Toggle Button - now at the top-right corner with high z-index */}
+            {/* Chat Toggle Button - at the top-right corner with high z-index */}
             {joined === "JOINED" && (
                 <button
                     onClick={() => setIsChatOpen(!isChatOpen)}
@@ -331,7 +330,7 @@ const MeetingView: React.FC<MeetingViewProps> = ({ meetingId, sessionId, interes
                             <path fillRule="evenodd" d="M5.47 5.47a.75.75 0 011.06 0L12 10.94l5.47-5.47a.75.75 0 111.06 1.06L13.06 12l5.47 5.47a.75.75 0 11-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 01-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 010-1.06z" clipRule="evenodd" />
                         </svg>
                     ) : (
-                        // Reverted to a standard chat icon that should be visible
+                        // Standard chat icon
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 24 24" fill="currentColor">
                             <path fillRule="evenodd" d="M4.848 2.771A9.75 9.75 0 0112 2.25c5.392 0 9.75 4.358 9.75 9.75s-4.358 9.75-9.75 9.75c-1.38 0-2.7-.207-3.957-.596L2.62 21.454a.75.75 0 01-1.003-.966l1.248-3.743a9.75 9.75 0 01-1.058-4.715C1.5 6.913 5.858 2.25 11.25 2.25h.75c-.015 0-.029 0-.044 0H4.848z" clipRule="evenodd" />
                         </svg>
