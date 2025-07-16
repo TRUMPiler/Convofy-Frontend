@@ -21,6 +21,7 @@ interface ChatPanelProps {
     currentUserAvatar: string;
     jwtToken: string | undefined;
     stompClientRef: React.MutableRefObject<Client | null>;
+    isStompConnected: boolean; // New prop for connection status
 }
 
 const ChatPanel: React.FC<ChatPanelProps> = ({
@@ -31,7 +32,8 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     currentUserName,
     currentUserAvatar,
     jwtToken,
-    stompClientRef
+    stompClientRef,
+    isStompConnected // Destructure new prop
 }) => {
     const [callMessages, setCallMessages] = useState<CallChatMessage[]>([]);
     const [newChatMessage, setNewChatMessage] = useState<string>('');
@@ -46,8 +48,9 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
 
     // WebSocket subscription for chat messages, now inside ChatPanel
     useEffect(() => {
-        if (!meetingId || !jwtToken || !stompClientRef.current || !stompClientRef.current.active) {
-            console.warn("ChatPanel: WebSocket for chat cannot be established: Missing essential data or client not active.");
+        // Only attempt to subscribe if STOMP client is connected and essential data is available
+        if (!isStompConnected || !meetingId || !jwtToken || !stompClientRef.current) {
+            console.warn("ChatPanel: Not subscribing to chat. STOMP not connected or missing essential data.");
             return;
         }
 
@@ -71,10 +74,11 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                 console.log("ChatPanel: Unsubscribed from meeting chat topic.");
             }
         };
-    }, [meetingId, jwtToken, stompClientRef]); // Dependencies for re-subscribing
+    }, [meetingId, jwtToken, stompClientRef, isStompConnected]); // Add isStompConnected to dependencies
 
     const handleSendChatMessage = useCallback(() => {
-        if (!newChatMessage.trim() || !meetingId || !stompClientRef.current || !stompClientRef.current.active) {
+        if (!newChatMessage.trim() || !meetingId || !stompClientRef.current || !stompClientRef.current.active || !isStompConnected) {
+            toast.error('Cannot send message: Chat service not connected.');
             return;
         }
 
@@ -100,7 +104,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         });
 
         setNewChatMessage(''); // Clear input after sending
-    }, [newChatMessage, meetingId, currentUserId, currentUserName, currentUserAvatar, jwtToken, stompClientRef]);
+    }, [newChatMessage, meetingId, currentUserId, currentUserName, currentUserAvatar, jwtToken, stompClientRef, isStompConnected]);
 
     const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === 'Enter') {
@@ -174,7 +178,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                     <button
                         type="submit"
                         className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center"
-                        disabled={!newChatMessage.trim()}
+                        disabled={!newChatMessage.trim() || !isStompConnected} // Disable if not connected
                     >
                         {/* Send Button Image Icon */}
                         <img width="24" height="24" src="https://img.icons8.com/material-sharp/24/sent.png" alt="Send" />

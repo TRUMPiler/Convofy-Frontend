@@ -40,8 +40,10 @@ const MeetingView: React.FC<MeetingViewProps> = ({ meetingId, sessionId, interes
     const [joined, setJoined] = useState<string | null>(null);
     const stompClientRef = useRef<Client | null>(null);
 
-    // State for chat visibility, now managed here and passed to ChatPanel
+    // State for chat visibility
     const [isChatOpen, setIsChatOpen] = useState<boolean>(false);
+    // New state to track STOMP connection status
+    const [isStompConnected, setIsStompConnected] = useState<boolean>(false);
 
     const currentUserId = Cookies.get("userId");
     const currentUserName = Cookies.get("name")?.toString() ?? "Guest";
@@ -160,6 +162,7 @@ const MeetingView: React.FC<MeetingViewProps> = ({ meetingId, sessionId, interes
             debug: (str) => console.log(`STOMP DEBUG: ${str}`),
             onConnect: () => {
                 console.log("Connected to WebSocket server for call/chat notifications.");
+                setIsStompConnected(true); // Set connected status to true
 
                 client.subscribe(`/call`, (message) => {
                     try {
@@ -174,15 +177,17 @@ const MeetingView: React.FC<MeetingViewProps> = ({ meetingId, sessionId, interes
                     }
                 }, { Authorization: `Bearer ${jwtToken}` });
 
-                // The chat subscription will now be handled within ChatPanel
+                // The chat subscription is now handled within ChatPanel
             },
             onStompError: (frame) => {
                 console.error('Broker reported error for call/chat WS: ' + frame.headers['message']);
                 console.error('Additional details: ' + frame.body);
                 toast.error('WebSocket error: ' + frame.headers['message']);
+                setIsStompConnected(false); // Set connected status to false on error
             },
             onDisconnect: () => {
                 console.log("Disconnected from WebSocket server for call/chat notifications.");
+                setIsStompConnected(false); // Set connected status to false on disconnect
             }
         });
 
@@ -248,9 +253,9 @@ const MeetingView: React.FC<MeetingViewProps> = ({ meetingId, sessionId, interes
                 </div>
             </header>
 
-          
+           {/* Main content area that grows */}
                 {/* Changed overflow-auto to overflow-hidden here */}
-                <div className="flex-grow grid grid-cols-1 md:grid-cols-2 gap-4 p-4 overflow-auto"> {/* Participant views */}
+                <div className="flex-grow grid grid-cols-1 md:grid-cols-2 gap-4 p-4 overflow-hidden"> {/* Participant views */}
                     {joined === "JOINED" ? (
                         <>
                             {/* Apply h-full and w-full to each ParticipantView container */}
@@ -310,8 +315,9 @@ const MeetingView: React.FC<MeetingViewProps> = ({ meetingId, sessionId, interes
                     currentUserAvatar={currentUserAvatar}
                     jwtToken={jwtToken}
                     stompClientRef={stompClientRef}
+                    isStompConnected={isStompConnected} // Pass the new connection status
                 />
-           
+          
 
             <footer className="flex-shrink-0 flex justify-center items-center p-4 bg-gray-800 shadow-lg space-x-4">
                 {joined === "JOINED" && (
